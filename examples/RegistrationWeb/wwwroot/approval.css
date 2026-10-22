@@ -1,0 +1,27 @@
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #203631; background: #f3f6f3; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at 15% 0%, #dfece2 0, transparent 55%); }
+main { width: min(100% - 40px, 600px); margin: 0 auto; padding: 52px 0 32px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; font-size: 17px; font-weight: 650; }
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: #244f40; color: white; }
+article { background: #fff; border: 1px solid #dfe7e0; border-radius: 24px; padding: 40px; box-shadow: 0 14px 48px #20363108; }
+.status-icon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; font-size: 28px; margin-bottom: 28px; }
+.success { color: #236646; background: #e9f4eb; }
+.error { color: #96492a; background: #fff0e6; }
+.eyebrow { font-size: 11px; font-weight: 750; letter-spacing: .13em; color: #547062; }
+h1 { font-size: clamp(27px, 6vw, 34px); letter-spacing: -.035em; line-height: 1.2; margin: 12px 0; }
+.intro { color: #62736b; font-size: 15px; line-height: 1.7; margin: 0; }
+section { margin-top: 30px; padding: 24px; background: #f7f9f6; border: 1px solid #e8ede6; border-radius: 14px; }
+h2 { margin: 0 0 18px; font-size: 15px; }
+dl { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+dt { font-size: 12px; color: #66776d; margin-bottom: 5px; }
+dd { margin: 0; font-size: 15px; font-weight: 550; overflow-wrap: anywhere; }
+footer { margin-top: 28px; padding-top: 22px; border-top: 1px solid #e8ede6; color: #68766e; font-size: 12px; line-height: 1.6; }
+.caption { text-align: center; color: #738078; font-size: 12px; margin-top: 24px; }
+@media (max-width: 480px) { main { padding-top: 26px; } article { padding: 26px 22px; } section { padding: 20px; } dl { grid-template-columns: 1fr; gap: 16px; } }
+form { display:grid; gap:18px; margin-top:24px; } label { display:grid; gap:8px; font-size:14px; } input, button { font:inherit; padding:13px; border-radius:9px; border:1px solid #b9cbbf; min-width:0; width:100%; } button { background:#244f40; color:white; cursor:pointer; font-weight:650; } input:focus-visible,button:focus-visible,a:focus-visible { outline:3px solid #8cb69d; outline-offset:3px; } a {color:#244f40;} code {overflow-wrap:anywhere;}
+.button { display:block; padding:13px; text-align:center; border-radius:9px; font-weight:650; text-decoration:none; }
+.secondary { border:1px solid #829d8e; background:#f3f6f3; color:#244f40; }
+.secondary:hover { background:#e3ece5; border-color:#244f40; }
+.secondary:active { background:#d5e3d9; }
+.notice { padding:16px; border-radius:10px; background:#fff5dc; color:#665021; line-height:1.6; }

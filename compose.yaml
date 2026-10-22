@@ -1,0 +1,8 @@
+services:
+  camunda:
+    image: camunda/camunda-bpm-platform:run-7.24.0
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      CAMUNDA_BPM_HISTORY_LEVEL: full
+    # Mistni ukazkovy engine; jeho vlozena databaze je docasna.

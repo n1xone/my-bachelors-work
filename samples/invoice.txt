@@ -1,0 +1,6 @@
+CONSOLE DEMONSTRATION INVOICE
+Invoice: CONSOLE-001
+Supplier: Example supplier
+Amount: 100
+Category: Misc
+This is a test attachment for the built-in Camunda Invoice Receipt process.

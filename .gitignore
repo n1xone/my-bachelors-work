@@ -1,0 +1,8 @@
+bin/
+obj/
+Data/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+*.user

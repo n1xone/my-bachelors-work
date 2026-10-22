@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn2:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:bpsim="http://www.bpsim.org/schemas/1.0" xmlns:drools="http://www.jboss.org/drools" id="_wKImoBEcED-xAOijIO5WiQ" targetNamespace="http://www.omg.org/bpmn20" exporter="Camunda Modeler" exporterVersion="5.45.0" xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd http://www.jboss.org/drools drools.xsd http://www.bpsim.org/schemas/1.0 bpsim.xsd http://www.omg.org/spec/DD/20100524/DC DC.xsd http://www.omg.org/spec/DD/20100524/DI DI.xsd ">
+  <bpmn2:itemDefinition id="_registraceTask_SkippableInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_PriorityInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_CommentInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_DescriptionInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_CreatedByInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_TaskNameInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_GroupIdInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_ContentInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_NotStartedReassignInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_NotCompletedReassignInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_NotStartedNotifyInputXItem" structureRef="Object" />
+  <bpmn2:itemDefinition id="_registraceTask_NotCompletedNotifyInputXItem" structureRef="Object" />
+  <bpmn2:collaboration id="_CC60693B-B2AC-41C8-9EA0-F273E17A53B6" name="Default Collaboration">
+    <bpmn2:participant id="_CC2899D3-E9D4-4FB8-845E-48777FD0D822" name="Pool Participant" processRef="prace_1" />
+  </bpmn2:collaboration>
+  <bpmn2:process id="prace_1" name="BAKALARKA" processType="Public" isExecutable="true" camunda:historyTimeToLive="30" drools:packageName="com.example" drools:version="1.0" drools:adHoc="false">
+    <bpmn2:documentation>This process represents a user registration workflow implemented using Camunda BPM.
+
+It includes:
+- User input via forms
+- Data validation using script tasks
+- External service integration via external tasks
+- Parallel execution for database persistence and email notification
+- Error handling and user redirection
+- Process variables for data flow control
+
+The process demonstrates core BPMN concepts including gateways, timers, and asynchronous processing.</bpmn2:documentation>
+    <bpmn2:startEvent id="start" name="Start registration">
+      <bpmn2:outgoing>Flow_1agwwlx</bpmn2:outgoing>
+    </bpmn2:startEvent>
+    <bpmn2:userTask id="reg" name="Fill registration form">
+      <bpmn2:documentation>User fills in registration data including name, email, password, and birth date.
+
+This task starts the registration process.</bpmn2:documentation>
+      <bpmn2:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="userFName" label="Name" type="string" />
+          <camunda:formField id="userRName" label="Surname" type="string" />
+          <camunda:formField id="birthDate" label="Date of birth" type="date" />
+          <camunda:formField id="userEmail" label="Email" type="string" />
+          <camunda:formField id="userPassword" label="Password" type="string" />
+        </camunda:formData>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>Flow_1agwwlx</bpmn2:incoming>
+      <bpmn2:incoming>Flow_1w531xv</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_1ad6r8v</bpmn2:outgoing>
+    </bpmn2:userTask>
+    <bpmn2:sequenceFlow id="Flow_1agwwlx" sourceRef="start" targetRef="reg" />
+    <bpmn2:exclusiveGateway id="choice_esxists" name="User exists?">
+      <bpmn2:documentation>Checks whether a user with the given email already exists in the system.
+
+If the user exists, the process is completed without creating a new account.
+If the user does not exist, the process continues to account creation.</bpmn2:documentation>
+      <bpmn2:incoming>Flow_0y19i5n</bpmn2:incoming>
+      <bpmn2:outgoing>user_0</bpmn2:outgoing>
+      <bpmn2:outgoing>user_1</bpmn2:outgoing>
+    </bpmn2:exclusiveGateway>
+    <bpmn2:sequenceFlow id="user_0" name="no (new user)" sourceRef="choice_esxists" targetRef="creating">
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${userExists == false}</bpmn2:conditionExpression>
+    </bpmn2:sequenceFlow>
+    <bpmn2:endEvent id="end_reg" name="Registration completed">
+      <bpmn2:incoming>user_1</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="user_1" name="yes (user exists)" sourceRef="choice_esxists" targetRef="end_reg">
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${userExists == true}</bpmn2:conditionExpression>
+    </bpmn2:sequenceFlow>
+    <bpmn2:endEvent id="end_create_reg" name="Account created and registration completed">
+      <bpmn2:incoming>Flow_1v0o8ed</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_1ad6r8v" sourceRef="reg" targetRef="exist_flag" />
+    <bpmn2:boundaryEvent id="Event_0xwjnbt" name="20 min for registration" attachedToRef="reg">
+      <bpmn2:outgoing>Flow_13cwkhd</bpmn2:outgoing>
+      <bpmn2:timerEventDefinition id="TimerEventDefinition_0hv5hx6">
+        <bpmn2:timeDuration xsi:type="bpmn2:tFormalExpression">PT20M</bpmn2:timeDuration>
+      </bpmn2:timerEventDefinition>
+    </bpmn2:boundaryEvent>
+    <bpmn2:boundaryEvent id="Event_002qhf2" name="20 min for creating" attachedToRef="creating">
+      <bpmn2:outgoing>Flow_1lpfcw7</bpmn2:outgoing>
+      <bpmn2:timerEventDefinition id="TimerEventDefinition_1acq8i9">
+        <bpmn2:timeDuration xsi:type="bpmn2:tFormalExpression">PT20M</bpmn2:timeDuration>
+      </bpmn2:timerEventDefinition>
+    </bpmn2:boundaryEvent>
+    <bpmn2:endEvent id="reg_error" name="Registration timeout">
+      <bpmn2:incoming>Flow_13cwkhd</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_13cwkhd" sourceRef="Event_0xwjnbt" targetRef="reg_error" />
+    <bpmn2:endEvent id="creating_error" name="Account creation timeout">
+      <bpmn2:incoming>Flow_1lpfcw7</bpmn2:incoming>
+    </bpmn2:endEvent>
+    <bpmn2:sequenceFlow id="Flow_1lpfcw7" sourceRef="Event_002qhf2" targetRef="creating_error" />
+    <bpmn2:serviceTask id="saving" name="Save user to DB" camunda:type="external" camunda:topic="db_save">
+      <bpmn2:documentation>Persists user data into the database.
+
+Executed as an external task.</bpmn2:documentation>
+      <bpmn2:extensionElements />
+      <bpmn2:incoming>Flow_0scsr6i</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_18j3r4n</bpmn2:outgoing>
+    </bpmn2:serviceTask>
+    <bpmn2:serviceTask id="creating" name="Create account" camunda:type="external" camunda:topic="create_account">
+      <bpmn2:documentation>External service responsible for creating a user account.
+
+Executed via external worker.
+May fail and be retried.</bpmn2:documentation>
+      <bpmn2:incoming>user_0</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_1of1jy7</bpmn2:outgoing>
+    </bpmn2:serviceTask>
+    <bpmn2:serviceTask id="exist_flag" name="Check registered users" camunda:type="external" camunda:topic="check_user">
+      <bpmn2:documentation>Checks email against the application users.txt store through the external worker.</bpmn2:documentation>
+      <bpmn2:incoming>Flow_1ad6r8v</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_0y19i5n</bpmn2:outgoing>
+      
+    </bpmn2:serviceTask>
+    <bpmn2:intermediateCatchEvent id="wait_for_approval" name="Wait for user approval">
+      <bpmn2:incoming>allright</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_16gkma7</bpmn2:outgoing>
+      <bpmn2:messageEventDefinition id="MessageEventDefinition_0ce7qly" messageRef="Message_1rqk1sv" />
+    </bpmn2:intermediateCatchEvent>
+    <bpmn2:sequenceFlow id="Flow_0y19i5n" sourceRef="exist_flag" targetRef="choice_esxists" />
+    <bpmn2:scriptTask id="validate_user_data" name="Validate user data" scriptFormat="javascript">
+      <bpmn2:documentation>Validates all user input fields:
+- name format
+- email format
+- password strength
+- birth date correctness
+
+Sets:
+- isValidRegistration (boolean)
+- validationErrors (string)</bpmn2:documentation>
+      <bpmn2:incoming>Flow_1of1jy7</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_18gq039</bpmn2:outgoing>
+      <bpmn2:script>var errors = [];
+
+var firstName = execution.getVariable("userFName");
+var lastName = execution.getVariable("userRName");
+var birthDate = execution.getVariable("birthDate");
+var email = execution.getVariable("userEmail");
+var password = execution.getVariable("userPassword");
+
+function isBlank(value) {
+  return value == null || String(value).trim() === "";
+}
+
+function isNameValid(value) {
+  return /^[A-Za-zА-Яа-яЁёČčŠšŽžÁáÉéÍíÓóÚúÝýŮůĚěŘřŤťĎďŇň\s-]+$/.test(String(value));
+}
+
+if (isBlank(firstName) || !isNameValid(firstName)) {
+  errors.push("First name must contain only letters");
+}
+
+if (isBlank(lastName) || !isNameValid(lastName)) {
+  errors.push("Last name must contain only letters");
+}
+
+if (isBlank(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
+  errors.push("Email is invalid");
+}
+
+var isValidPassword = String(execution.getVariable("passwordValidated")) === "true" ||
+  !isBlank(password) &amp;&amp;
+  String(password).length &gt;= 6 &amp;&amp;
+  /[A-Za-z]/.test(String(password)) &amp;&amp;
+  /[0-9]/.test(String(password));
+
+if (!isValidPassword) {
+  errors.push("Password must contain letters and numbers, min 6 chars");
+}
+
+var date = birthDate != null &amp;&amp; typeof birthDate.getTime === "function"
+  ? new Date(Number(birthDate.getTime())) : new Date(String(birthDate));
+var now = new Date();
+
+if (isBlank(birthDate) || isNaN(date.getTime()) || date &gt; now) {
+  errors.push("Birth date is invalid");
+}
+
+var isValidRegistration = errors.length === 0;
+
+execution.setVariable("isValidRegistration", isValidRegistration);
+execution.setVariable("validationErrors", errors.join("; "));</bpmn2:script>
+    </bpmn2:scriptTask>
+    <bpmn2:sequenceFlow id="Flow_1of1jy7" sourceRef="creating" targetRef="validate_user_data" />
+    <bpmn2:exclusiveGateway id="check_information" name="Correct info?">
+      <bpmn2:documentation>Validates the user input data (name, email, password, birth date).
+
+If the data is valid, the process continues to approval and account creation.
+If the data is invalid, the user is redirected back to the registration form.</bpmn2:documentation>
+      <bpmn2:incoming>Flow_18gq039</bpmn2:incoming>
+      <bpmn2:outgoing>allright</bpmn2:outgoing>
+      <bpmn2:outgoing>Flow_1w531xv</bpmn2:outgoing>
+    </bpmn2:exclusiveGateway>
+    <bpmn2:sequenceFlow id="Flow_18gq039" sourceRef="validate_user_data" targetRef="check_information" />
+    <bpmn2:sequenceFlow id="allright" name="yes (valid)" sourceRef="check_information" targetRef="wait_for_approval">
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${isValidRegistration == true}</bpmn2:conditionExpression>
+    </bpmn2:sequenceFlow>
+    <bpmn2:sequenceFlow id="Flow_1w531xv" name="no (invalid)" sourceRef="check_information" targetRef="reg">
+      <bpmn2:conditionExpression xsi:type="bpmn2:tFormalExpression">${isValidRegistration == false}</bpmn2:conditionExpression>
+    </bpmn2:sequenceFlow>
+    <bpmn2:parallelGateway id="save_email_start" name="Save account + confirm">
+      <bpmn2:incoming>Flow_16gkma7</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_06elzo3</bpmn2:outgoing>
+      <bpmn2:outgoing>Flow_0scsr6i</bpmn2:outgoing>
+    </bpmn2:parallelGateway>
+    <bpmn2:sequenceFlow id="Flow_16gkma7" sourceRef="wait_for_approval" targetRef="save_email_start" />
+    <bpmn2:serviceTask id="confirm_email" name="Send confirmation email" camunda:type="external" camunda:topic="send_email">
+      <bpmn2:documentation>Sends a confirmation email to the user after successful registration.
+
+Executed in parallel with saving to database.</bpmn2:documentation>
+      <bpmn2:incoming>Flow_06elzo3</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_1cai02l</bpmn2:outgoing>
+    </bpmn2:serviceTask>
+    <bpmn2:sequenceFlow id="Flow_06elzo3" sourceRef="save_email_start" targetRef="confirm_email" />
+    <bpmn2:sequenceFlow id="Flow_0scsr6i" sourceRef="save_email_start" targetRef="saving" />
+    <bpmn2:parallelGateway id="save_email_end" name="End">
+      <bpmn2:incoming>Flow_18j3r4n</bpmn2:incoming>
+      <bpmn2:incoming>Flow_1cai02l</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_1kb4u27</bpmn2:outgoing>
+    </bpmn2:parallelGateway>
+    <bpmn2:sequenceFlow id="Flow_18j3r4n" sourceRef="saving" targetRef="save_email_end" />
+    <bpmn2:sequenceFlow id="Flow_1cai02l" sourceRef="confirm_email" targetRef="save_email_end" />
+    <bpmn2:scriptTask id="show_info_prepare" name="Prepare result message" scriptFormat="javascript">
+      <bpmn2:documentation>Prepares a final message for the user indicating success or failure of registration.</bpmn2:documentation>
+      <bpmn2:incoming>Flow_1kb4u27</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_18e5qhe</bpmn2:outgoing>
+      <bpmn2:script>var email = execution.getVariable("userEmail");
+
+execution.setVariable(
+  "resultMessage",
+  "Registrace byla úspěšně dokončena. Účet pro " + email + " byl vytvořen a uložen."
+);</bpmn2:script>
+    </bpmn2:scriptTask>
+    <bpmn2:userTask id="show_results" name="Výsledek registrace">
+      <bpmn2:documentation>Displays the result of the registration process to the user in Tasklist UI.
+
+Includes validation errors or success message.</bpmn2:documentation>
+      <bpmn2:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="resultMessage" label="Stav registrace" type="string" />
+          <camunda:formField id="userFName" label="Jméno" type="string" />
+          <camunda:formField id="userRName" label="Příjmení" type="string" />
+          <camunda:formField id="userEmail" label="E-mail" type="string" />
+          <camunda:formField id="birthDate" label="Datum narození" type="date" />
+        </camunda:formData>
+      </bpmn2:extensionElements>
+      <bpmn2:incoming>Flow_18e5qhe</bpmn2:incoming>
+      <bpmn2:outgoing>Flow_1v0o8ed</bpmn2:outgoing>
+    </bpmn2:userTask>
+    <bpmn2:sequenceFlow id="Flow_1kb4u27" sourceRef="save_email_end" targetRef="show_info_prepare" />
+    <bpmn2:sequenceFlow id="Flow_18e5qhe" sourceRef="show_info_prepare" targetRef="show_results" />
+    <bpmn2:sequenceFlow id="Flow_1v0o8ed" sourceRef="show_results" targetRef="end_create_reg" />
+  </bpmn2:process>
+  <bpmn2:message id="Message_1rqk1sv" name="approve_user" />
+  <bpmndi:BPMNDiagram>
+    <bpmndi:BPMNPlane bpmnElement="prace_1">
+      <bpmndi:BPMNShape id="Event_03uo8eo_di" bpmnElement="start">
+        <dc:Bounds x="162" y="432" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="140" y="475" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_021353a_di" bpmnElement="reg">
+        <dc:Bounds x="280" y="410" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0hdm863_di" bpmnElement="choice_esxists" isMarkerVisible="true">
+        <dc:Bounds x="705" y="425" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="781" y="440" width="61" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_09zxo9l_di" bpmnElement="end_reg">
+        <dc:Bounds x="832" y="512" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="821" y="555" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1xxvd4r" bpmnElement="end_create_reg">
+        <dc:Bounds x="1732" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1713" y="298" width="80" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1afz9a0_di" bpmnElement="reg_error">
+        <dc:Bounds x="422" y="82" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="413" y="125" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_066dvr4" bpmnElement="creating_error">
+        <dc:Bounds x="532" y="82" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="511" y="125" width="82" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_00odlvg_di" bpmnElement="saving">
+        <dc:Bounds x="1120" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_15erzr5_di" bpmnElement="creating">
+        <dc:Bounds x="530" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0zpe8rw_di" bpmnElement="exist_flag">
+        <dc:Bounds x="500" y="410" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1mklkvd_di" bpmnElement="wait_for_approval">
+        <dc:Bounds x="1032" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1019" y="295" width="63" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1dpcwop_di" bpmnElement="validate_user_data">
+        <dc:Bounds x="730" y="230" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1ofr9y3" bpmnElement="check_information" isMarkerVisible="true">
+        <dc:Bounds x="905" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="898" y="221" width="64" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_1hkiu1g_di" bpmnElement="save_email_start">
+        <dc:Bounds x="1145" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1181" y="236" width="77" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_14tjtmg_di" bpmnElement="confirm_email">
+        <dc:Bounds x="1120" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0uyiss0" bpmnElement="save_email_end">
+        <dc:Bounds x="1315" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1370" y="252" width="20" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_077477j_di" bpmnElement="show_results">
+        <dc:Bounds x="1570" y="230" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1ldq14a_di" bpmnElement="show_info_prepare">
+        <dc:Bounds x="1420" y="230" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0pias65_di" bpmnElement="Event_002qhf2">
+        <dc:Bounds x="612" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="658" y="216" width="49" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_14xex6m_di" bpmnElement="Event_0xwjnbt">
+        <dc:Bounds x="362" y="392" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="408" y="396" width="55" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1agwwlx_di" bpmnElement="Flow_1agwwlx">
+        <di:waypoint x="198" y="450" />
+        <di:waypoint x="280" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ozng9f_di" bpmnElement="user_0">
+        <di:waypoint x="730" y="425" />
+        <di:waypoint x="730" y="368" />
+        <di:waypoint x="580" y="368" />
+        <di:waypoint x="580" y="310" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="586" y="353" width="68" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1s34b3n_di" bpmnElement="user_1">
+        <di:waypoint x="730" y="475" />
+        <di:waypoint x="730" y="530" />
+        <di:waypoint x="832" y="530" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="740" y="513" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ad6r8v_di" bpmnElement="Flow_1ad6r8v">
+        <di:waypoint x="380" y="450" />
+        <di:waypoint x="500" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13cwkhd_di" bpmnElement="Flow_13cwkhd">
+        <di:waypoint x="380" y="392" />
+        <di:waypoint x="380" y="100" />
+        <di:waypoint x="422" y="100" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1lpfcw7_di" bpmnElement="Flow_1lpfcw7">
+        <di:waypoint x="630" y="212" />
+        <di:waypoint x="630" y="100" />
+        <di:waypoint x="568" y="100" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0y19i5n_di" bpmnElement="Flow_0y19i5n">
+        <di:waypoint x="600" y="450" />
+        <di:waypoint x="705" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1of1jy7_di" bpmnElement="Flow_1of1jy7">
+        <di:waypoint x="630" y="270" />
+        <di:waypoint x="730" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18gq039_di" bpmnElement="Flow_18gq039">
+        <di:waypoint x="830" y="270" />
+        <di:waypoint x="905" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ud5j0h_di" bpmnElement="allright">
+        <di:waypoint x="955" y="270" />
+        <di:waypoint x="1032" y="270" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="969" y="252" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1w531xv_di" bpmnElement="Flow_1w531xv">
+        <di:waypoint x="930" y="295" />
+        <di:waypoint x="930" y="670" />
+        <di:waypoint x="330" y="490" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="943" y="497" width="54" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16gkma7_di" bpmnElement="Flow_16gkma7">
+        <di:waypoint x="1068" y="270" />
+        <di:waypoint x="1145" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06elzo3_di" bpmnElement="Flow_06elzo3">
+        <di:waypoint x="1170" y="295" />
+        <di:waypoint x="1170" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0scsr6i_di" bpmnElement="Flow_0scsr6i">
+        <di:waypoint x="1170" y="245" />
+        <di:waypoint x="1170" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18j3r4n_di" bpmnElement="Flow_18j3r4n">
+        <di:waypoint x="1220" y="150" />
+        <di:waypoint x="1340" y="150" />
+        <di:waypoint x="1340" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1cai02l_di" bpmnElement="Flow_1cai02l">
+        <di:waypoint x="1220" y="380" />
+        <di:waypoint x="1340" y="380" />
+        <di:waypoint x="1340" y="295" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1kb4u27_di" bpmnElement="Flow_1kb4u27">
+        <di:waypoint x="1365" y="270" />
+        <di:waypoint x="1420" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18e5qhe_di" bpmnElement="Flow_18e5qhe">
+        <di:waypoint x="1520" y="270" />
+        <di:waypoint x="1570" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1v0o8ed_di" bpmnElement="Flow_1v0o8ed">
+        <di:waypoint x="1670" y="270" />
+        <di:waypoint x="1732" y="270" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmn2:relationship type="BPSimData">
+    <bpmn2:extensionElements>
+      <bpsim:BPSimData>
+        <bpsim:Scenario id="default" name="Simulationscenario">
+          <bpsim:ScenarioParameters />
+          <bpsim:ElementParameters elementRef="registraceTask">
+            <bpsim:TimeParameters>
+              <bpsim:ProcessingTime>
+                <bpsim:NormalDistribution mean="0" standardDeviation="0" />
+              </bpsim:ProcessingTime>
+            </bpsim:TimeParameters>
+            <bpsim:ResourceParameters>
+              <bpsim:Availability>
+                <bpsim:FloatingParameter value="0" />
+              </bpsim:Availability>
+              <bpsim:Quantity>
+                <bpsim:FloatingParameter value="0" />
+              </bpsim:Quantity>
+            </bpsim:ResourceParameters>
+            <bpsim:CostParameters>
+              <bpsim:UnitCost>
+                <bpsim:FloatingParameter value="0" />
+              </bpsim:UnitCost>
+            </bpsim:CostParameters>
+          </bpsim:ElementParameters>
+          <bpsim:ElementParameters elementRef="StartEvent_1">
+            <bpsim:TimeParameters>
+              <bpsim:ProcessingTime>
+                <bpsim:NormalDistribution mean="0" standardDeviation="0" />
+              </bpsim:ProcessingTime>
+            </bpsim:TimeParameters>
+          </bpsim:ElementParameters>
+        </bpsim:Scenario>
+      </bpsim:BPSimData>
+    </bpmn2:extensionElements>
+    <bpmn2:source>_wKImoBEcED-xAOijIO5WiQ</bpmn2:source>
+    <bpmn2:target>_wKImoBEcED-xAOijIO5WiQ</bpmn2:target>
+  </bpmn2:relationship>
+</bpmn2:definitions>

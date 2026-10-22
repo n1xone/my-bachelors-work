@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+ xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+ xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="RegistrationDefinitions" targetNamespace="https://bakalarka.example/processes">
+ <bpmn:message id="RegistrationConfirmed" name="registration_confirmed" />
+ <bpmn:process id="console_registration" name="Registrace — konzolová ukázka" isExecutable="true" camunda:historyTimeToLive="30">
+  <bpmn:documentation>Console-only registration: typed form, decision, manual external task and direct message confirmation. No email, browser, password or application database required.</bpmn:documentation>
+  <bpmn:startEvent id="registration_start" name="Registrace"><bpmn:outgoing>f1</bpmn:outgoing></bpmn:startEvent>
+  <bpmn:userTask id="registration_form" name="Vyplnit registraci">
+   <bpmn:extensionElements><camunda:formData>
+    <camunda:formField id="userName" label="Jméno" type="string"><camunda:validation><camunda:constraint name="required" /></camunda:validation></camunda:formField>
+    <camunda:formField id="department" label="Oddělení" type="string" />
+    <camunda:formField id="approved" label="Schválit registraci?" type="boolean" defaultValue="true" />
+   </camunda:formData></bpmn:extensionElements><bpmn:incoming>f1</bpmn:incoming><bpmn:outgoing>f2</bpmn:outgoing></bpmn:userTask>
+  <bpmn:exclusiveGateway id="approval_decision" name="Schváleno?" default="f_reject"><bpmn:incoming>f2</bpmn:incoming><bpmn:outgoing>f_approve</bpmn:outgoing><bpmn:outgoing>f_reject</bpmn:outgoing></bpmn:exclusiveGateway>
+  <bpmn:serviceTask id="store_registration_task" name="Zpracovat registraci" camunda:type="external" camunda:topic="store_registration"><bpmn:incoming>f_approve</bpmn:incoming><bpmn:outgoing>f3</bpmn:outgoing></bpmn:serviceTask>
+  <bpmn:intermediateCatchEvent id="await_confirmation" name="Potvrzení z konzole"><bpmn:incoming>f3</bpmn:incoming><bpmn:outgoing>f4</bpmn:outgoing><bpmn:messageEventDefinition messageRef="RegistrationConfirmed" /></bpmn:intermediateCatchEvent>
+  <bpmn:endEvent id="registration_completed" name="Dokončeno"><bpmn:incoming>f4</bpmn:incoming></bpmn:endEvent>
+  <bpmn:endEvent id="registration_rejected" name="Zamítnuto"><bpmn:incoming>f_reject</bpmn:incoming></bpmn:endEvent>
+  <bpmn:sequenceFlow id="f1" sourceRef="registration_start" targetRef="registration_form" />
+  <bpmn:sequenceFlow id="f2" sourceRef="registration_form" targetRef="approval_decision" />
+  <bpmn:sequenceFlow id="f_approve" name="Ano" sourceRef="approval_decision" targetRef="store_registration_task"><bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved == true}</bpmn:conditionExpression></bpmn:sequenceFlow>
+  <bpmn:sequenceFlow id="f_reject" name="Ne" sourceRef="approval_decision" targetRef="registration_rejected" />
+  <bpmn:sequenceFlow id="f3" sourceRef="store_registration_task" targetRef="await_confirmation" />
+  <bpmn:sequenceFlow id="f4" sourceRef="await_confirmation" targetRef="registration_completed" />
+ </bpmn:process>
+ <bpmndi:BPMNDiagram id="RegistrationDiagram"><bpmndi:BPMNPlane id="RegistrationPlane" bpmnElement="console_registration">
+  <bpmndi:BPMNShape id="start_di" bpmnElement="registration_start"><dc:Bounds x="100" y="142" width="36" height="36" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="review_di" bpmnElement="registration_form"><dc:Bounds x="190" y="120" width="100" height="80" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="decision_di" bpmnElement="approval_decision" isMarkerVisible="true"><dc:Bounds x="350" y="135" width="50" height="50" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="prepare_di" bpmnElement="store_registration_task"><dc:Bounds x="460" y="120" width="100" height="80" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="wait_di" bpmnElement="await_confirmation"><dc:Bounds x="630" y="142" width="36" height="36" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="complete_di" bpmnElement="registration_completed"><dc:Bounds x="740" y="142" width="36" height="36" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNShape id="reject_di" bpmnElement="registration_rejected"><dc:Bounds x="357" y="292" width="36" height="36" /></bpmndi:BPMNShape>
+  <bpmndi:BPMNEdge id="f1_di" bpmnElement="f1"><di:waypoint x="136" y="160" /><di:waypoint x="190" y="160" /></bpmndi:BPMNEdge>
+  <bpmndi:BPMNEdge id="f2_di" bpmnElement="f2"><di:waypoint x="290" y="160" /><di:waypoint x="350" y="160" /></bpmndi:BPMNEdge>
+  <bpmndi:BPMNEdge id="approve_di" bpmnElement="f_approve"><di:waypoint x="400" y="160" /><di:waypoint x="460" y="160" /></bpmndi:BPMNEdge>
+  <bpmndi:BPMNEdge id="reject_edge_di" bpmnElement="f_reject"><di:waypoint x="375" y="185" /><di:waypoint x="375" y="292" /></bpmndi:BPMNEdge>
+  <bpmndi:BPMNEdge id="f3_di" bpmnElement="f3"><di:waypoint x="560" y="160" /><di:waypoint x="630" y="160" /></bpmndi:BPMNEdge>
+  <bpmndi:BPMNEdge id="f4_di" bpmnElement="f4"><di:waypoint x="666" y="160" /><di:waypoint x="740" y="160" /></bpmndi:BPMNEdge>
+ </bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</bpmn:definitions>
