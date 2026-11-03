@@ -1,106 +1,123 @@
-# API pro přístup k BPMN procesům v Camunda enginu
+# API pro přístup k BPMN procesům v Camundě
 
-Samostatná knihovna **Camunda.Api v C# / .NET 10** a interaktivní konzole pro **Camunda 7**. Hlavním cílem je obecné programové rozhraní pro další aplikaci, například verifikační komponentu. Konzole toto rozhraní používá k ovládání skutečného enginu.
+Bakalářský projekt v C# / .NET 10. Obsahuje knihovnu `Camunda.Api` pro Camunda 7 REST API a konzolovou aplikaci pro práci s procesy. Knihovnu může použít i další C# aplikace, například verifikační komponenta.
 
 ## Spuštění
 
+Potřebujete .NET 10 SDK a běžící Camundu 7. Camundu spusťte samostatně, například ve svém Docker kontejneru. Potom v kořeni projektu spusťte konzoli:
+
 ```bash
-# Pokud uz mate vlastni Camundu spustenou, dalsi engine nepotrebujete.
 dotnet run
 ```
 
-Výchozí server: `http://localhost:8080/engine-rest/`. Jiné připojení:
+Výchozí adresa je `http://localhost:8080/engine-rest/`. Připojení k jinému serveru:
 
 ```bash
 CAMUNDA_URL=http://localhost:18080/engine-rest/ dotnet run
 ```
 
-Volitelná autentizace: `CAMUNDA_USERNAME` a `CAMUNDA_PASSWORD` pro HTTP Basic. Pro nový lokální engine je připraven `docker compose up -d` (port 8080). Před připojením počkejte na dokončení startu Camundy.
+Pro HTTP Basic autentizaci nastavte `CAMUNDA_USERNAME` a `CAMUNDA_PASSWORD`.
 
-Konzole používá české popisky, nabídky a nápovědu. Názvy modelů a aktivit zůstávají tak, jak jsou definované v BPMN.
-
-## Ovládání
-
-Menu zůstává otevřené do `0 / Ukončit` nebo Ctrl+C. Čísla vybírají položky, `0` vrací zpět, `:back` ruší rozepsaný vstup. Po operaci se načte nový stav. Enter v kartě instance aktualizuje přehled. Síťové chyby nevyvolávají automatické opakování zápisu.
-
-- **Modely:** všechny dostupné nasazené definice, včetně standardních Invoice Receipt a ReviewInvoice, jejich verzí a případných tenantů. Start používá konkrétní ID vybrané definice.
-- **Odstranění nasazení:** výběr nasazení, přehled jeho definic a výslovné potvrzení. Odstraňují se všechny definice v nasazení; instance se nekaskádují.
-- **Instance:** aktuální úlohy, externí úlohy, čekající události, incidenty, pozastavení, obnovení, zrušení a přechod do podprocesu vytvořeného call activity.
-- **Úlohy:** claim/unclaim, konzolový vstup proměnných a submit-form s validací na serveru.
-- **Externí úlohy:** výběr přesného úkolu, zamknutí až po zadání dat, dokončení, ohlášení chyby a změna počtu pokusů.
-- **Události:** korelace zprávy vybrané instanci a signal cílený na konkrétní execution. Potvrzení může proběhnout přímo z konzole, bez e-mailu.
-- **Data:** typované proměnné včetně souborů, BPMN XML, strom aktivit a historie.
-- **Jobs:** diagnostika, opakování po chybě a explicitní spuštění jobu; lze tím spustit i časovač před jeho termínem.
-
-Konkrétní návody: **[HOW_TO_RUN.md](HOW_TO_RUN.md)**. Návrh a hranice: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Procesy pro demonstraci
-
-| Proces | Účel |
-| --- | --- |
-| `console_registration` | Nová registrace bez pošty, hesel a webových stránek: formulář, rozhodnutí, ručně dokončená externí úloha, zpráva z konzole |
-| `order_approval` | Schválení/zamítnutí objednávky, externí úloha a zpráva o doručení |
-| `invoice` | Originální Invoice Receipt dodaný v Camunda Run; vstupní průvodce obsahuje soubor faktury potřebný pro serverové archivování |
-| `ReviewInvoice` | Originální přezkoumání faktury; přiřazení kontrolora, vyjasnění, také otevření z rodičovského invoice |
-| `prace_1` | Původní registrační model, pokud je již nasazený; dostupný obecnými operacemi stejně jako ostatní modely |
-
-Položka **5 hlavního menu** nasadí nové výukové modely registrace a objednávky. Standardní modely Camundy konzole načítá z vašeho serveru; nekopíruje je bez jejich DMN a Java delegátů. Pokud server nebyl spuštěn s ukázkovou invoice aplikací, nebudou v seznamu. Jakýkoliv další vykonatelný BPMN lze nasadit z nabídky nebo příkazem `deploy`.
-
-Obchodní efekt externí úlohy provádí volající/worker. Konzolové dokončení znamená předání jejího výsledku, nikoliv automatické odeslání e-mailu či zápis do cizí databáze. Nový hlavní program nespouští SMTP ani původní web. Původní web a jeho data jsou zachované v `examples/RegistrationWeb/` jako archivní příklad; pro nové ovládání je nespouštějte.
-
-## Architektura
-
-```text
-Interaktivní konzole / budoucí verifikační komponenta
-                     │ ICamundaClient
-                     ▼
-               CamundaClient (C#)
-                     │ REST / HTTP
-                     ▼
-               Server Camunda 7
-                     │
-            BPMN definice a instance
-```
-
-| Soubor / složka | Odpovědnost |
-| --- | --- |
-| `src/Camunda.Api/ICamundaClient.cs` | Veřejný asynchronní kontrakt |
-| `src/Camunda.Api/CamundaClient*.cs` | HTTP adaptér, serializace, chyby a obecné operace |
-| `src/Camunda.Api/Models.cs` | DTO a typované proměnné |
-| `Console/Terminal.cs` | Jednotný výpis, číselné nabídky a obsluha vstupu |
-| `Console/InteractiveConsole*.cs` | Navigace, karta instance, provádění vybrané operace |
-| `Console/VariableEditor.cs` | Typovaný vstup a čtení metadat BPMN formuláře |
-| `Console/ExampleInputs.cs` | Oddělené vstupní nápovědy pro ukázkové modely |
-| `Console/ProcessWatcher.cs` | Samostatný režim průběžného sledování |
-| `Console/ScenarioDemo.cs` | Automatické integrační scénáře |
-| `models/`, `samples/` | Dvě výukové BPMN a malé testovací přílohy |
-| `tests/` | Kontraktní a integrační ověření |
-
-Knihovna nezná registrační formuláře, názvy invoice aktivit, SMTP ani konzoli. Nápovědy specifické pro modely jsou pouze v konzolové vrstvě. U nového BPMN se pole čtou z `camunda:formData`; chybějící proměnné lze vždy zadat podle názvu a typu. HTML/JavaScript formuláře se v konzoli nevykonávají.
-
-## Příkazy a ověření
+V menu se vybírá číslem, `0` vrací zpět a `:back` ruší zadávání. Enter v přehledu instance obnoví stav. Podrobné postupy jsou v [HOW_TO_RUN.md](HOW_TO_RUN.md).
 
 ```bash
-dotnet run -- help                      # všechny samostatné příkazy
-dotnet run -- watch                     # průběžný výpis změn, samostatný terminál
-dotnet run -- watch console_registration
-dotnet run -- demo                      # automatický test, bez e-mailu
+dotnet run -- help     # seznam příkazů
+dotnet run -- watch    # průběžné sledování změn
+dotnet run -- demo     # automatické scénáře na připojené Camundě
+```
 
+## Možnosti
+
+- Nahrání BPMN, seznam definic a verzí, stažení XML a odstranění nasazení bez kaskádního mazání instancí.
+- Spuštění procesu, přehled instancí a podprocesů, pozastavení, obnovení a zrušení.
+- Čtení a zápis typovaných proměnných včetně souborů.
+- Převzetí a dokončení uživatelských úloh, odeslání formuláře s validací na serveru.
+- Zamknutí a dokončení externích úloh, hlášení chyby a nastavení počtu pokusů.
+- Zprávy, signály, strom aktivit, jobs, incidenty a historie.
+
+Položka **5 — Přidat ukázkové modely** nasadí `console_registration` a `order_approval` ze složky `models/`. Registrace ukazuje formulář, rozhodnutí, externí úlohu a čekání na zprávu; objednávka obsahuje schválení a zamítnutí. Konzole také obsahuje vstupní nápovědy pro standardní Invoice a ReviewInvoice, pokud jsou nainstalované na serveru.
+
+## Struktura
+
+```text
+Konzole / další C# aplikace
+          │ ICamundaClient
+          ▼
+     CamundaClient
+          │ HTTP / JSON
+          ▼
+       Camunda 7
+```
+
+| Cesta | Obsah |
+| --- | --- |
+| `Program.cs` | Připojení k serveru a výběr příkazu |
+| `src/Camunda.Api/ICamundaClient.cs` | Veřejné rozhraní knihovny |
+| `src/Camunda.Api/CamundaClient*.cs` | REST požadavky, serializace a zpracování chyb |
+| `src/Camunda.Api/Models.cs` | Datové typy odpovědí a proměnných |
+| `Console/InteractiveConsole*.cs` | Menu, přehled instance a práce s úlohami |
+| `Console/Terminal.cs` | Vstup a výstup terminálu |
+| `Console/VariableEditor.cs` | Formulářová pole a převod hodnot na typované proměnné |
+| `Console/ExampleInputs.cs` | Nápovědy pro ukázkové procesy |
+| `Console/Pagination.cs` | Načtení stránkovaných seznamů pro menu a sledovač |
+| `Console/ProcessWatcher.cs` | Sledování změn pravidelným dotazováním |
+| `Console/ScenarioDemo.cs` | Automatické scénáře |
+| `models/`, `samples/` | BPMN modely a vzorová příloha faktury |
+| `tests/` | Testy knihovny a konzole |
+
+Soubory `InteractiveConsole.*` tvoří jeden částečný (`partial`) třídní celek; stejně tak `CamundaClient.*`. Složky `bin/` a `obj/` vytváří .NET při sestavení. V průzkumníku VS Code jsou skryté.
+
+## Použití knihovny
+
+Připojte projekt `src/Camunda.Api/Camunda.Api.csproj` ke své C# aplikaci:
+
+```csharp
+using Camunda.Api;
+
+using var http = new HttpClient
+{
+    BaseAddress = new Uri("http://localhost:8080/engine-rest/")
+};
+ICamundaClient api = new CamundaClient(http);
+var instances = await api.GetInstancesAsync(firstResult: 0, maxResults: 100);
+foreach (var instance in instances)
+{
+    var activities = await api.GetActivitiesAsync(instance.Id);
+    Console.WriteLine($"{instance.Id}: {activities.ChildActivityInstances.Length} aktivních větví");
+}
+```
+
+Volající vlastní `HttpClient` a nastavuje autentizaci i timeout. Seznamy podporují `firstResult/maxResults`; ukázka čte první stránku. `CamundaException` obsahuje HTTP status a tělo chyby. Zápisy se automaticky neopakují, protože při ztrátě odpovědi už mohly být provedeny.
+
+## Omezení
+
+Knihovna podporuje Camundu 7 a uvedené operace, nikoli celý REST API. Neobsahuje formální verifikátor, správu uživatelů ani migrace procesů. Absence incidentu sama o sobě nedokazuje absenci deadlocku.
+
+Jednotlivé dotazy netvoří atomický snímek. `watch` může minout změny mezi dvěma dotazy. Výsledek ukončené instance se čte z historie; její dostupnost závisí na nastavení serveru.
+
+Obchodní logiku externí úlohy provádí její worker. Ruční dokončení v konzoli pouze předá výsledek Camundě. Java delegáty a DMN musí být dostupné na serveru. Konzole čte `camunda:formData`, ale nevykonává HTML/JavaScript formuláře. Soubory se při nahrávání načítají do paměti.
+
+## Testy
+
+Bez běžící Camundy:
+
+```bash
 dotnet build
 dotnet run --project tests/Camunda.Api.Tests
 python3 tests/watch.py
-# Samostatna Camunda Run s priklady je nutna; vytvari se vlastni testovaci instance:
+```
+
+Testy knihovny ověřují HTTP požadavky, typy proměnných, chyby a konzolový vstup. Test sledovače spouští lokální HTTP server a skutečný CLI proces. Python testy používají standardní knihovnu.
+
+Pro ověření menu na skutečném serveru použijte samostatnou Camunda Run se standardními příklady Invoice/ReviewInvoice:
+
+```bash
 CAMUNDA_URL=http://localhost:18080/engine-rest/ python3 tests/console_flow.py
 ```
 
-Ověřeno na Camunda Run 7.24.0: 38 kontraktních a vstupních kontrol, pět konzolových integračních scénářů (včetně vnořeného ReviewInvoice) a čtyři automatické demo scénáře prošly.
+Test vytváří vlastní instance a uklízí své nedokončené běhy. Příkaz `demo` ověřuje učební modely, včetně chyby externí úlohy a zrušení procesu.
 
-`watch` čte stav v intervalu, není úplným auditem. Může minout rychlé změny a nevidí neuložené psaní ve formuláři. Menu záměrně nevypisuje asynchronní události doprostřed rozepsaného vstupu; obnovení stavu je explicitní.
-
-Projekt není úplnou náhradou administrace Camundy ani formálním verifikátorem. Poskytuje přístup k modelům, běhu a vybraným řídicím operacím pro další komponentu. Camunda 8 není podporována.
-
-## Zdroje
+## Dokumentace Camundy
 
 - [Camunda 7 REST API](https://docs.camunda.org/manual/7.24/reference/rest/)
-- [Typované proměnné včetně File](https://docs.camunda.org/manual/7.24/reference/rest/overview/variables/)
-- [Implementace submit-form a claim v Camunda](https://github.com/camunda/camunda-bpm-platform/blob/master/engine-rest/engine-rest/src/main/java/org/camunda/bpm/engine/rest/sub/task/impl/TaskResourceImpl.java)
+- [Typované proměnné](https://docs.camunda.org/manual/7.24/reference/rest/overview/variables/)

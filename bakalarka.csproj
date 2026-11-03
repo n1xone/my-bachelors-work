@@ -8,7 +8,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Content Include="samples/*" CopyToOutputDirectory="PreserveNewest" />

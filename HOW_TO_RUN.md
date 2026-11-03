@@ -8,7 +8,7 @@ Spusťte Camundu, počkejte na její načtení a v kořenové složce projektu s
 dotnet run
 ```
 
-Otevře se české konzolové menu. Pokud stále běží starší web nebo sledovač, ukončete ho pomocí Ctrl+C. Sledovač lze spustit samostatně příkazem `dotnet run -- watch`.
+Otevře se české konzolové menu. Sledovač lze spustit samostatně příkazem `dotnet run -- watch` a ukončit pomocí Ctrl+C.
 
 Výchozí adresa je `http://localhost:8080/engine-rest/`. Jinou adresu lze nastavit takto:
 
@@ -16,11 +16,11 @@ Výchozí adresa je `http://localhost:8080/engine-rest/`. Jinou adresu lze nasta
 CAMUNDA_URL=http://localhost:18080/engine-rest/ dotnet run
 ```
 
-Pokud ještě nemáte server, spusťte `docker compose up -d`. Nespouštějte druhý server na stejném portu, pokud už běží `camunda7`. Připravenost ověříte příkazem `curl --fail http://localhost:8080/engine-rest/version`.
+Camundu spusťte samostatně, například ve svém Docker kontejneru. Pokud již běží, použijte stávající server. Připravenost ověříte příkazem `curl --fail http://localhost:8080/engine-rest/version`.
 
-## Registrace bez e-mailu
+## Registrace
 
-1. V hlavním menu zvolte **5 — Přidat ukázkové modely bez e-mailu**. Nahraje se registrace a objednávka. Opakované nahrání stejné verze omezuje filtrování duplicit.
+1. V hlavním menu zvolte **5 — Přidat ukázkové modely**. Nahraje se registrace a objednávka. Opakované nahrání stejné verze omezuje filtrování duplicit.
 2. Zvolte **1 — Modely procesů** → **Registrace — konzolová ukázka**, klíč `console_registration` → **Spustit tuto verzi**.
 3. Zadejte označení instance nebo ponechte prázdné. Na výzvu k další proměnné stiskněte Enter.
 4. V kartě instance zvolte **1 — Úlohy** → **Vyplnit registraci** → **Vyplnit údaje a dokončit**.
@@ -42,11 +42,11 @@ V kartě instance otevřete **Úlohy → Approve Invoice → Vyplnit údaje a do
 
 ReviewInvoice lze spustit i samostatně. Pokud vaše distribuce Camundy neobsahuje ukázkovou fakturační aplikaci, její model a závislosti Java/DMN musí být nainstalované na serveru; samotný BPMN soubor je nenahradí.
 
-## Objednavka
+## Objednávka
 
 Vyberte model `order_approval`, spusťte jej a otevřete úlohu **Schválit objednávku**. Zadejte `ano` nebo `ne`. Při schválení dokončete externí úlohu `prepare_order` a v událostech předejte `order_delivered`. Při zamítnutí instance ihned skončí.
 
-## Dostupne funkce
+## Dostupné funkce
 
 | Oblast | Funkce |
 | --- | --- |
@@ -73,8 +73,6 @@ Enter ponechá zobrazenou hodnotu nebo přeskočí prázdné pole. `:back` zruš
 Všechny dostupné modely se načítají ze serveru, ale jejich Java delegáty, DMN, oprávnění a obchodní pravidla zůstávají na straně Camundy. Konzole neurčuje výsledek externího úkolu; zadá jej uživatel nebo samostatný worker. Oprávnění určuje server a hodnota `demo` při převzetí úkolu není přihlášením.
 
 Odstranění v menu smaže celé nasazení včetně všech jeho zdrojů. Je vyžadováno potvrzení a požadavek nepoužívá kaskádní mazání; běžící instance proto tento příkaz nemaže a Camunda může odstranění odmítnout, pokud tomu brání vazby na instance. Pro úplné odstranění historie a běhů použijte administraci Camundy.
-
-Starý model `prace_1` zůstává zachován. Jeho čekání na `approve_user` lze obsloužit v nabídce **Zprávy**. Pro novou ukázku použijte `console_registration`, který neobsahuje původní e-mailovou logiku. Pokud stále běží starý webový worker, bude dál samostatně zpracovávat jeho úkoly; ukončete jej pomocí Ctrl+C.
 
 ## Testy
 

@@ -1,4 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
- <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
- <ItemGroup><ProjectReference Include="../../src/Camunda.Api/Camunda.Api.csproj" /></ItemGroup>
-<ItemGroup><Compile Include="../../Console/Terminal.cs" Link="Terminal.cs" /><Compile Include="../../Console/VariableEditor.cs" Link="VariableEditor.cs" /></ItemGroup></Project>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Camunda.Api/Camunda.Api.csproj" />
+    <Compile Include="../../Console/Terminal.cs" Link="Terminal.cs" />
+    <Compile Include="../../Console/VariableEditor.cs" Link="VariableEditor.cs" />
+    <Compile Include="../../Console/Pagination.cs" Link="Pagination.cs" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text.Json;
 using Camunda.Api;
 
@@ -8,9 +7,13 @@ namespace Bakalarka.ConsoleApp;
 internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui)
 {
     private CancellationToken shutdown;
+
     private readonly VariableEditor editor = new(ui);
+
     private readonly string workerId = "console-" + Guid.NewGuid().ToString("N");
+
     private readonly Dictionary<string, ProcessDefinition> definitions = new();
+
     private readonly Dictionary<string, string> models = new();
 
     public async Task RunAsync(string address, CancellationToken ct)
@@ -19,28 +22,51 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         ui.Heading("CAMUNDA • Správa procesů");
         ui.Field("Server", address);
         ui.Line("  Akce vybírejte číslem. 0 — zpět, :back — zrušit zadávání, Ctrl+C — ukončit.");
-        ui.Line("  Všechny akce probíhají zde. E-mail ani samostatné webové stránky nejsou potřeba.");
+
         try
         {
             while (true)
             {
                 ui.Heading("Hlavní nabídka");
-                var choice = await ui.Menu(["Modely procesů — výběr a spuštění", "Aktivní procesy — úlohy a ovládání",
-                    "Historie procesů", "Nahrát BPMN ze souboru", "Přidat ukázkové modely bez e-mailu", "Návod k použití",
-                    "Odstranit nasazení modelu"], ct, "Ukončit");
-                if (choice == 0) return;
+                var choice = await ui.Menu(
+                [
+                    "Modely procesů — výběr a spuštění",
+                    "Aktivní procesy — úlohy a ovládání",
+                    "Historie procesů",
+                    "Nahrát BPMN ze souboru",
+                    "Přidat ukázkové modely",
+                    "Návod k použití",
+                    "Odstranit nasazení modelu"
+                ], ct, "Ukončit");
+
+                if (choice == 0)
+                    return;
                 await GuardAsync(async () =>
                 {
                     switch (choice)
                     {
-                        case 1: await DefinitionsAsync(ct); break;
-                        case 2: await InstancesAsync(null, ct); break;
-                        case 3: await HistoryListAsync(ct); break;
-                        case 4: await DeployAsync(await ui.Ask("Cesta k souboru .bpmn", ct), ct); break;
+                        case 1:
+                            await DefinitionsAsync(ct);
+                            break;
+
+                        case 2:
+                            await InstancesAsync(null, ct);
+                            break;
+
+                        case 3:
+                            await HistoryListAsync(ct);
+                            break;
+
+                        case 4:
+                            await DeployAsync(await ui.Ask("Cesta k souboru .bpmn", ct), ct);
+                            break;
+
                         case 5:
+
                             foreach (var file in new[] { "registration-console.bpmn", "order-approval.bpmn" })
                                 await DeployAsync(Path.Combine(AppContext.BaseDirectory, "models", file), ct);
                             break;
+
                         case 6:
                             ui.Line("  1. Otevřete modely: seznam se načítá z Camundy, včetně Invoice a ReviewInvoice.");
                             ui.Line("  2. Vyberte verzi, spusťte proces a vyplňte vstupní pole.");
@@ -49,11 +75,14 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
                             ui.Line("  5. Pokud proces čeká na podproces, otevřete jej z přehledu nadřazeného procesu.");
                             ui.Line("  Po provedení akce se stav znovu načte. Enter v přehledu — obnovit.");
                             ui.Line("  Průběžné sledování v jiném terminálu: dotnet run -- watch");
-                            ui.Line("  Pro registraci bez e-mailu přidejte ukázkové modely a vyberte console_registration.");
+                            ui.Line("  Pro registraci přidejte ukázkové modely a vyberte console_registration.");
                             ui.Line("  Externí úloha: předáváte výsledek práce, konzole neprovádí její obchodní logiku.");
                             await ui.Pause(ct);
                             break;
-                        case 7: await DeleteDeploymentAsync(ct); break;
+
+                        case 7:
+                            await DeleteDeploymentAsync(ct);
+                            break;
                     }
                 });
             }
@@ -63,43 +92,49 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
 
     private async Task GuardAsync(Func<Task> action)
     {
-        try { await action(); }
+        try
+        {
+            await action();
+        }
         catch (OperationCanceledException) when (!shutdown.IsCancellationRequested)
-        { ui.Error(new TimeoutException("Server neodpověděl včas.")); }
+        {
+            ui.Error(new TimeoutException("Server neodpověděl včas."));
+        }
         catch (BackException) { ui.Line("  Zadávání bylo zrušeno."); }
         catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or ArgumentException or InvalidOperationException or FormatException or System.Xml.XmlException or UnauthorizedAccessException or OverflowException)
-        { ui.Error(ex); }
-    }
-
-    private static async Task<List<T>> All<T>(Func<int, Task<IReadOnlyList<T>>> page)
-    {
-        var result = new List<T>();
-        for (var offset = 0; ; offset += 100)
         {
-            var chunk = await page(offset);
-            result.AddRange(chunk);
-            if (chunk.Count < 100) return result;
+            ui.Error(ex);
         }
     }
 
     private async Task LoadDefinitionsAsync(CancellationToken ct)
     {
-        var available = await All(offset => api.GetDefinitionsAsync(offset, 100, ct));
+        var available = await Pagination.ReadAllAsync((offset, limit) => api.GetDefinitionsAsync(offset, limit, ct));
         definitions.Clear();
+
         foreach (var definition in available)
             definitions[definition.Id] = definition;
     }
+
     private string DefinitionName(string id) => definitions.TryGetValue(id, out var d) ? $"{d.Name ?? d.Key} · v{d.Version}" : id;
+
     private string Key(string id) => definitions.TryGetValue(id, out var d) ? d.Key : id.Split(':')[0];
+
     private async Task<string> XmlAsync(string definitionId, CancellationToken ct)
     {
         if (!models.TryGetValue(definitionId, out var xml))
             models[definitionId] = xml = (await api.GetBpmnAsync(definitionId, ct)).Bpmn20Xml;
+
         return xml;
     }
-    private async Task<IReadOnlyList<InputField>> FieldsAsync(string definitionId, string? activity, CancellationToken ct)
+
+    private async Task<IReadOnlyList<InputField>> FieldsAsync(
+        string definitionId,
+        string? activity,
+        CancellationToken ct)
     {
         var fields = VariableEditor.ReadBpmnFields(await XmlAsync(definitionId, ct), activity);
+
         return fields.Count > 0 ? fields : ExampleInputs.For(Key(definitionId), activity);
     }
 
@@ -109,20 +144,33 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         ui.Heading("Modely • všechny verze dostupné přes toto připojení");
         var model = await ui.Select(definitions.Values.OrderBy(d => d.Key).ThenByDescending(d => d.Version).ToArray(),
             d => $"{d.Name ?? d.Key} | {d.Key} | v{d.Version}{(d.TenantId is null ? "" : " | tenant=" + d.TenantId)}{(d.Suspended ? " | POZASTAVENO" : "")}", ct);
-        if (model is null) return;
+
+        if (model is null)
+            return;
         ui.Heading(model.Name ?? model.Key);
         ui.Field("ID definice", model.Id);
+
         switch (await ui.Menu(["Spustit tuto verzi", "Otevřít aktivní instance tohoto procesu", "Uložit BPMN XML do souboru"], ct))
         {
             case 1:
-                if (model.Suspended) { ui.Line("  Definice je v enginu pozastavena."); return; }
+
+                if (model.Suspended)
+                {
+                    ui.Line("  Definice je v enginu pozastavena.");
+                    return;
+                }
+
                 var businessKey = await ui.Ask("Označení instance / Enter — bez označení", ct);
                 var variables = await editor.EditAsync(await FieldsAsync(model.Id, null, ct), null, ct);
                 var instance = await api.StartByDefinitionAsync(model.Id, variables, businessKey.Length == 0 ? null : businessKey, ct);
                 ui.Success("Proces spuštěn: " + instance.Id);
                 await InstanceAsync(instance.Id, ct);
                 break;
-            case 2: await InstancesAsync(model.Key, ct); break;
+
+            case 2:
+                await InstancesAsync(model.Key, ct);
+                break;
+
             case 3:
                 var path = await ui.Ask("Nový soubor pro BPMN", ct);
                 await using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
@@ -137,9 +185,11 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
     {
         await LoadDefinitionsAsync(ct);
         ui.Heading("Aktivní procesy");
-        var instances = await All(offset => api.GetInstancesAsync(key, offset, 100, ct));
+        var instances = await Pagination.ReadAllAsync((offset, limit) => api.GetInstancesAsync(key, offset, limit, ct));
         var instance = await ui.Select(instances, p => $"{DefinitionName(p.DefinitionId)} | {p.BusinessKey ?? "bez označení"} | {p.Id[..Math.Min(8, p.Id.Length)]}{(p.Suspended ? " | POZASTAVENO" : "")}", ct);
-        if (instance is not null) await InstanceAsync(instance.Id, ct);
+
+        if (instance is not null)
+            await InstanceAsync(instance.Id, ct);
     }
 
     private async Task DeployAsync(string path, CancellationToken ct)
@@ -163,10 +213,13 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
             .ToArray();
         var selected = await ui.Select(deployments,
             deployment => $"{deployment.Definitions[0].Name ?? deployment.Definitions[0].Key} | {string.Join(", ", deployment.Definitions.Select(definition => $"{definition.Key} v{definition.Version}"))} | {deployment.Id}", ct);
-        if (selected is null) return;
+
+        if (selected is null)
+            return;
 
         ui.Line("  Odstraní všechny definice v tomto nasazení. Instance ani historie se nekaskádují.");
         var confirmation = await ui.Ask("Pro potvrzení napište ODSTRANIT", ct);
+
         if (confirmation != "ODSTRANIT")
         {
             ui.Line("  Nasazení nebylo změněno.");
@@ -189,9 +242,23 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
             for (var i = 0; i < page.Count; i++)
                 ui.Line($"  {i + 1,2}. {Terminal.Clean(DefinitionName(page[i].ProcessDefinitionId))} | {Terminal.State(page[i].State)} | {page[i].Id}");
             var choice = await ui.Ask("Číslo — otevřít; n — další strana; p — předchozí strana; 0 — nabídka", ct);
-            if (choice == "0") return;
-            if (choice == "n") { if (page.Count == 20) offset += 20; continue; }
-            if (choice == "p") { offset = Math.Max(0, offset - 20); continue; }
+
+            if (choice == "0")
+                return;
+
+            if (choice == "n")
+            {
+                if (page.Count == 20)
+                    offset += 20;
+                continue;
+            }
+
+            if (choice == "p")
+            {
+                offset = Math.Max(0, offset - 20);
+                continue;
+            }
+
             if (int.TryParse(choice, out var index) && index > 0 && index <= page.Count)
                 await ShowHistoryAsync(page[index - 1].Id, ct);
         }
@@ -207,7 +274,8 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         ui.Field("Začátek", history.StartTime);
         ui.Field("Konec", history.EndTime);
         ui.Field("Důvod zrušení", history.DeleteReason);
-        foreach (var activity in await All(offset => api.GetActivityHistoryAsync(id, offset, 100, ct)))
+
+        foreach (var activity in await Pagination.ReadAllAsync((offset, limit) => api.GetActivityHistoryAsync(id, offset, limit, ct)))
             ui.Line($"  {(activity.Canceled ? "ZRUŠENA " : activity.EndTime is null ? "AKTIVNÍ " : "HOTOVO  ")} | {Terminal.Short(activity.ActivityName ?? activity.ActivityId),-42} | {activity.ActivityType}");
         await ui.Pause(ct);
     }

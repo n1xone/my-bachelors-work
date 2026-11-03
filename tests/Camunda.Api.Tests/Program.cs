@@ -7,24 +7,32 @@ using Bakalarka.ConsoleApp;
 var count = 0;
 void Check(bool condition, string message)
 {
-    if (!condition) throw new Exception("FAIL: " + message);
+    if (!condition)
+        throw new Exception("FAIL: " + message);
     count++;
     Console.WriteLine("PASS: " + message);
 }
+
 async Task Throws<T>(Func<Task> operation, string message) where T : Exception
 {
-    try { await operation(); }
+    try
+    {
+        await operation();
+    }
     catch (T) { Check(true, message); return; }
     throw new Exception("FAIL: " + message);
 }
+
 var handler = new Stub();
 using var http = new HttpClient(handler) { BaseAddress = new Uri("http://engine.test/engine-rest/") };
 ICamundaClient api = new CamundaClient(http);
 handler.Response = """{"id":"p1","definitionId":"arbitrary:1:1","businessKey":"business","ended":false,"suspended":false}""";
 await api.StartAsync("arbitrary key +&", new Dictionary<string, Variable>
 {
-    ["flag"] = Variable.Boolean(true), ["count"] = Variable.Integer(7),
-    ["nothing"] = Variable.Null(), ["text"] = Variable.String("a<&\""),
+    ["flag"] = Variable.Boolean(true),
+    ["count"] = Variable.Integer(7),
+    ["nothing"] = Variable.Null(),
+    ["text"] = Variable.String("a<&\""),
     ["large"] = Variable.Long(9007199254740993)
 }, "business");
 Check(handler.Uri!.AbsolutePath == "/engine-rest/process-definition/key/arbitrary%20key%20%2B%26/start", "arbitrary process key is escaped");
@@ -57,6 +65,7 @@ using (var body = JsonDocument.Parse(handler.Body!))
     Check(topic.GetProperty("processInstanceId").GetString() == "p1" && topic.GetProperty("lockDuration").GetInt64() == 12345,
         "fetch locks only requested instance with requested duration");
 }
+
 await api.GetDefinitionsAsync(100, 25);
 Check(handler.Uri!.Query.Contains("firstResult=100&maxResults=25"), "pagination reaches engine");
 await api.DeleteDeploymentAsync("deployment /1");
@@ -67,7 +76,12 @@ await Throws<ArgumentException>(() => api.FetchAndLockAsync("w", []), "empty top
 handler.Status = HttpStatusCode.InternalServerError;
 handler.Response = """{"type":"ProcessEngineException","message":"bad expression"}""";
 var before = handler.Calls;
-try { await api.StartAsync("bad"); throw new Exception("Missing engine error"); }
+
+try
+{
+    await api.StartAsync("bad");
+    throw new Exception("Missing engine error");
+}
 catch (CamundaException ex)
 {
     Check(ex.StatusCode == HttpStatusCode.InternalServerError && ex.ResponseBody.Contains("bad expression"), "engine error status and details preserved");
@@ -85,7 +99,12 @@ using var cts = new CancellationTokenSource();
 cts.Cancel();
 await Throws<OperationCanceledException>(() => api.GetDefinitionsAsync(ct: cts.Token), "cancellation propagated");
 using var invalidHttp = new HttpClient { BaseAddress = new Uri("http://engine.test/engine-rest") };
-try { _ = new CamundaClient(invalidHttp); throw new Exception("Invalid URL accepted"); }
+
+try
+{
+    _ = new CamundaClient(invalidHttp);
+    throw new Exception("Invalid URL accepted");
+}
 catch (ArgumentException) { Check(true, "missing trailing slash rejected"); }
 handler.Status = HttpStatusCode.NoContent;
 await api.ClaimTaskAsync("t1", "demo");
@@ -124,17 +143,57 @@ var terminal = new Terminal(new StringReader("wrong\n2\n"), new StringWriter());
 Check(await terminal.Menu(["A", "B"], default) == 2, "invalid menu input does not leave the menu");
 var fileVariable = Variable.File([1, 2, 3], "invoice.pdf", "application/pdf");
 Check(fileVariable.Type == "File" && fileVariable.Value.GetString() == "AQID" && fileVariable.ValueInfo!["filename"].GetString() == "invoice.pdf", "file variable retains base64 content and filename metadata");
+Check(VariableEditor.Display(fileVariable) == "Soubor: invoice.pdf", "file display uses filename");
+Check(VariableEditor.Display(fileVariable with { ValueInfo = new() }) == "Soubor: —", "file display accepts missing filename");
+Check(VariableEditor.Display(fileVariable with { ValueInfo = null }) == "Soubor: —", "file display accepts missing metadata");
+Check(VariableEditor.Parse("{\"x\":1}", "Json").Value.GetString() == "{\"x\":1}", "JSON variable retains serialized content");
+await Throws<JsonException>(() => Task.FromResult(VariableEditor.Parse("{broken", "Json")), "invalid JSON rejected");
+
+var source = Enumerable.Range(0, 205).ToArray();
+var offsets = new List<int>();
+var collected = await Pagination.ReadAllAsync<int>((offset, limit) =>
+{
+    offsets.Add(offset);
+
+    return Task.FromResult<IReadOnlyList<int>>(source.Skip(offset).Take(limit).ToArray());
+});
+Check(collected.SequenceEqual(source) && offsets.SequenceEqual([0, 100, 200]), "pagination reads full and partial pages without losing items");
+var empty = await Pagination.ReadAllAsync<int>((offset, limit) => Task.FromResult<IReadOnlyList<int>>([]));
+Check(empty.Count == 0, "pagination accepts empty result");
+await Throws<HttpRequestException>(() => Pagination.ReadAllAsync<int>((offset, limit) => throw new HttpRequestException("offline")), "pagination propagates request failure");
 Console.WriteLine($"{count} checks passed.");
 
 sealed class Stub : HttpMessageHandler
 {
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
+
     public string Response { get; set; } = "{}";
-    public Uri? Uri { get; private set; }
-    public HttpMethod? Method { get; private set; }
-    public string? Body { get; private set; }
-    public string? ContentType { get; private set; }
-    public int Calls { get; private set; }
+
+    public Uri? Uri
+    {
+        get; private set;
+    }
+
+    public HttpMethod? Method
+    {
+        get; private set;
+    }
+
+    public string? Body
+    {
+        get; private set;
+    }
+
+    public string? ContentType
+    {
+        get; private set;
+    }
+
+    public int Calls
+    {
+        get; private set;
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -143,6 +202,7 @@ sealed class Stub : HttpMessageHandler
         Method = request.Method;
         ContentType = request.Content?.Headers.ContentType?.ToString();
         Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
+
         return new HttpResponseMessage(Status) { Content = new StringContent(Response, Encoding.UTF8, "application/json") };
     }
 }
