@@ -1,0 +1,6 @@
+services:
+  camunda-sandbox:
+    image: camunda/camunda-bpm-platform:run-latest
+    ports:
+      - "127.0.0.1:18080:8080"
+    command: ["./camunda.sh", "--webapps", "--rest"]

@@ -39,7 +39,8 @@ public sealed record ProcessDefinition(
     int Version,
     string DeploymentId,
     bool Suspended,
-    string? TenantId = null);
+    string? TenantId = null,
+    string? Resource = null);
 
 public sealed record Deployment(
     string Id,
@@ -148,3 +149,5 @@ public sealed record Execution(
     string? ProcessInstanceId,
     bool Ended,
     string? ActivityId = null);
+
+public sealed record DeploymentResource(string Id, string Name);

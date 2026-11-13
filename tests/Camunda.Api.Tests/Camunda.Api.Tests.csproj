@@ -7,8 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Camunda.Api/Camunda.Api.csproj" />
-    <Compile Include="../../Console/Terminal.cs" Link="Terminal.cs" />
-    <Compile Include="../../Console/VariableEditor.cs" Link="VariableEditor.cs" />
-    <Compile Include="../../Console/Pagination.cs" Link="Pagination.cs" />
+    <Compile Include="../../BpmnEditorHost.cs" Link="BpmnEditorHost.cs" />
+    <Compile Include="../../Console/*.cs" Link="Console/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

@@ -94,6 +94,7 @@ handler.Response = """{"id":"d1","name":"test","deployedProcessDefinitions":{}}"
 using var bpmn = new MemoryStream(Encoding.UTF8.GetBytes("<definitions />"));
 await api.DeployAsync("test", bpmn, "test.bpmn");
 Check(handler.ContentType!.StartsWith("multipart/form-data") && handler.Body!.Contains("test.bpmn") && handler.Body.Contains("<definitions />"), "deployment is multipart with original BPMN");
+Check(handler.Body.Contains("enable-duplicate-filtering") && handler.Body.Contains("true"), "deployment enables duplicate filtering");
 Check(bpmn.CanRead, "deployment preserves caller stream ownership");
 using var cts = new CancellationTokenSource();
 cts.Cancel();
@@ -149,6 +150,39 @@ Check(VariableEditor.Display(fileVariable with { ValueInfo = null }) == "Soubor:
 Check(VariableEditor.Parse("{\"x\":1}", "Json").Value.GetString() == "{\"x\":1}", "JSON variable retains serialized content");
 await Throws<JsonException>(() => Task.FromResult(VariableEditor.Parse("{broken", "Json")), "invalid JSON rejected");
 
+var tempRoot = Path.Combine(Path.GetTempPath(), "bpmn-editor-discovery-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(Path.Combine(tempRoot, "models"));
+Directory.CreateDirectory(Path.Combine(tempRoot, ".sandbox-models"));
+Directory.CreateDirectory(Path.Combine(tempRoot, "IntegratedVisualizer", "Utility", "diagrams", "tests"));
+Directory.CreateDirectory(Path.Combine(tempRoot, ".sandbox-models", "IntegratedVisualizer", "Utility", "diagrams"));
+var sourceModel = Path.Combine(tempRoot, "models", "alpha.bpmn");
+var sandboxModel = Path.Combine(tempRoot, ".sandbox-models", "beta.bpmn");
+var legacyCopy = Path.Combine(tempRoot, ".sandbox-models", "alpha.bpmn");
+var userDiagram = Path.Combine(tempRoot, "IntegratedVisualizer", "Utility", "diagrams", "registration.bpmn");
+var userDiagramCopy = Path.Combine(tempRoot, ".sandbox-models", "IntegratedVisualizer", "Utility", "diagrams", "registration.bpmn");
+var fixtureDiagram = Path.Combine(tempRoot, "IntegratedVisualizer", "Utility", "diagrams", "tests", "fixture.bpmn");
+await File.WriteAllTextAsync(sourceModel, "<definitions />");
+await File.WriteAllTextAsync(sandboxModel, "<definitions />");
+await File.WriteAllTextAsync(legacyCopy, "<definitions />");
+await File.WriteAllTextAsync(userDiagram, "<definitions />");
+await File.WriteAllTextAsync(userDiagramCopy, "<definitions />");
+await File.WriteAllTextAsync(fixtureDiagram, "<definitions />");
+var discovered = BpmnEditorHost.DiscoverModelFiles(tempRoot);
+Check(discovered.Contains(sourceModel) && !discovered.Contains(legacyCopy) && discovered.Contains(sandboxModel), "discovery collapses unchanged legacy copies but retains sandbox-only drafts");
+Check(discovered.Contains(userDiagram) && !discovered.Contains(userDiagramCopy) && !discovered.Contains(fixtureDiagram), "saved user diagrams appear once while nested visualizer fixtures stay hidden");
+var editorCloseSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+using (BpmnEditorHost.RouteCtrlCToEditor(editorCloseSignal))
+    Check(BpmnEditorHost.TryHandleEditorCtrlC() && editorCloseSignal.Task.IsCompleted, "Ctrl+C while editor is open returns through its close signal");
+Check(!BpmnEditorHost.TryHandleEditorCtrlC(), "Ctrl+C routing returns to application shutdown outside the editor");
+var sandboxPath = BpmnEditorHost.GetSandboxCopyPath(sourceModel, tempRoot);
+Check(Path.GetDirectoryName(sandboxPath) == Path.Combine(tempRoot, ".sandbox-models", "models") && Path.GetFileName(sandboxPath) == "alpha.bpmn", "source models are copied into an isolated sandbox subtree");
+var userSandboxPath = BpmnEditorHost.GetSandboxCopyPath(userDiagram, tempRoot);
+Check(userSandboxPath.StartsWith(Path.Combine(tempRoot, ".sandbox-models", "IntegratedVisualizer"), StringComparison.Ordinal), "user diagrams keep their relative path in the sandbox");
+var editableDiagram = BpmnEditorHost.ResolveEditableModelPath("IntegratedVisualizer/Utility/diagrams/registration.bpmn", tempRoot);
+await File.WriteAllTextAsync(editableDiagram, "<definitions id=\"edited\" />");
+Check(await File.ReadAllTextAsync(userDiagram) == "<definitions />", "editing a discovered diagram never changes its project source");
+Directory.Delete(tempRoot, recursive: true);
+
 var source = Enumerable.Range(0, 205).ToArray();
 var offsets = new List<int>();
 var collected = await Pagination.ReadAllAsync<int>((offset, limit) =>
@@ -161,6 +195,56 @@ Check(collected.SequenceEqual(source) && offsets.SequenceEqual([0, 100, 200]), "
 var empty = await Pagination.ReadAllAsync<int>((offset, limit) => Task.FromResult<IReadOnlyList<int>>([]));
 Check(empty.Count == 0, "pagination accepts empty result");
 await Throws<HttpRequestException>(() => Pagination.ReadAllAsync<int>((offset, limit) => throw new HttpRequestException("offline")), "pagination propagates request failure");
+var importRoot = Path.Combine(Path.GetTempPath(), "sandbox-import-" + Guid.NewGuid().ToString("N"));
+try
+{
+    using var sourceHandler = new ImportStub();
+    using var sourceHttp = new HttpClient(sourceHandler) { BaseAddress = new Uri("http://source.test/engine-rest/") };
+    var sourceClient = new CamundaClient(sourceHttp);
+    var definition = new ProcessDefinition("../../prace:14", "prace_1", "BAKALARKA", 14, "deployment", false, "tenant-a", "folder/registration.bpmn");
+    var draft = await SandboxWorkspace.ImportAsync(sourceClient, definition, importRoot);
+    Check(Path.GetFullPath(draft).StartsWith(Path.GetFullPath(importRoot) + Path.DirectorySeparatorChar), "untrusted definition IDs stay inside workspace");
+    Check(File.ReadAllText(draft).Contains("prace_1"), "registration imported from main engine");
+    Check(sourceHandler.Methods.All(m => m == HttpMethod.Get), "source import performs GET requests only");
+    await File.WriteAllTextAsync(draft, "<definitions>edited</definitions>");
+    var calls = sourceHandler.Methods.Count;
+    Check(await SandboxWorkspace.ImportAsync(sourceClient, definition, importRoot) == draft && sourceHandler.Methods.Count == calls && File.ReadAllText(draft).Contains("edited"), "reimport preserves edited draft without network requests");
+    handler.Response = "{\"id\":\"sandbox-deployment\",\"name\":\"sandbox\"}";
+    await SandboxWorkspace.DeployAsync(api, draft, default);
+    Check(handler.Body!.Contains("edited") && handler.Body.Contains("decision-data") && handler.Body.Contains("tenant-a") && handler.Body.Contains("folder/registration.bpmn"), "sandbox deployment retains edits, dependency resources, tenant and original resource names");
+    sourceHandler.Definitions = [definition with { Id = "old", Version = 13 }, definition,
+        definition with { Id = "second-tenant", TenantId = "tenant-b" }];
+    var sync = await SandboxWorkspace.SynchronizeAsync(sourceClient, importRoot);
+    Check(sync.Available == 2 && sync.Imported == 2 && sync.Errors.Count == 0, "catalogue imports latest version for each process and tenant");
+    Check(File.ReadAllText(draft).Contains("edited"), "catalogue refresh preserves local edits");
+    sourceHandler.Definitions = [definition with { Id = "new", Version = 15 }, definition,
+        definition with { Id = "second-tenant", TenantId = "tenant-b" }];
+    await SandboxWorkspace.SynchronizeAsync(sourceClient, importRoot);
+    var catalogue = BpmnEditorHost.DiscoverModelFiles(importRoot);
+    Check(catalogue.Count == 2 && !catalogue.Contains(draft) && File.Exists(draft), "catalogue shows one latest draft per tenant and retains older edits on disk");
+    Check(sourceHandler.Methods.All(m => m == HttpMethod.Get), "catalogue synchronization never mutates source engine");
+    var previousRoot = Directory.GetCurrentDirectory();
+    try
+    {
+        Directory.SetCurrentDirectory(importRoot);
+        sourceHandler.Offline = true;
+        var output = new StringWriter();
+        var offlineTerminal = new Terminal(new StringReader("1\n1\n0\n0\n"), output);
+        var sandboxCalls = handler.Calls;
+        await new InteractiveConsole(api, offlineTerminal, true, sourceClient).RunAsync(CamundaConnections.SandboxAddress, default);
+        Check(output.ToString().Contains("uloženými kopiemi") && output.ToString().Contains("BAKALARKA"), "offline sandbox menu still opens cached main processes");
+        Check(handler.Calls == sandboxCalls, "browsing cached models does not deploy or start processes");
+        sourceHandler.Offline = false;
+    }
+    finally { Directory.SetCurrentDirectory(previousRoot); }
+    var completeImports = Directory.GetDirectories(Path.Combine(importRoot, ".sandbox-models", "camunda")).Length;
+    sourceHandler.FailResource = true;
+    await Throws<CamundaException>(() => SandboxWorkspace.ImportAsync(sourceClient, definition with { Id = "another" }, importRoot), "failed resource import propagates error");
+    Check(Directory.GetDirectories(Path.Combine(importRoot, ".sandbox-models", "camunda")).Length == completeImports, "failed import leaves no partial draft");
+    await Throws<InvalidOperationException>(() => { CamundaConnections.EnsureSeparate("http://localhost:18080/engine-rest/"); return Task.CompletedTask; }, "main URL cannot alias local sandbox");
+    CamundaConnections.EnsureSeparate("http://localhost:8080/engine-rest/");
+}
+finally { if (Directory.Exists(importRoot)) Directory.Delete(importRoot, true); }
 Console.WriteLine($"{count} checks passed.");
 
 sealed class Stub : HttpMessageHandler
@@ -204,5 +288,25 @@ sealed class Stub : HttpMessageHandler
         Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
 
         return new HttpResponseMessage(Status) { Content = new StringContent(Response, Encoding.UTF8, "application/json") };
+    }
+}
+
+sealed class ImportStub : HttpMessageHandler
+{
+    public List<HttpMethod> Methods { get; } = [];
+    public bool FailResource { get; set; }
+    public bool Offline { get; set; }
+    public ProcessDefinition[] Definitions { get; set; } = [];
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        Methods.Add(request.Method);
+        if (Offline) throw new HttpRequestException("source offline");
+        var path = request.RequestUri!.AbsolutePath;
+        var body = path.EndsWith("/process-definition") ? JsonSerializer.Serialize(Definitions, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            : path.EndsWith("/xml") ? "{\"bpmn20Xml\":\"<definitions />\"}"
+            : path.EndsWith("/resources") ? "[{\"id\":\"bpmn\",\"name\":\"folder/registration.bpmn\"},{\"id\":\"dmn\",\"name\":\"../decision.dmn\"}]"
+            : path.Contains("/bpmn/") ? "<definitions id=\"prace_1\" />" : "decision-data";
+        return Task.FromResult(new HttpResponseMessage(FailResource && path.EndsWith("/data") ? HttpStatusCode.InternalServerError : HttpStatusCode.OK)
+        { Content = new StringContent(body, Encoding.UTF8, "application/json") });
     }
 }

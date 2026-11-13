@@ -18,12 +18,15 @@ CAMUNDA_URL=http://localhost:18080/engine-rest/ dotnet run
 
 Pro HTTP Basic autentizaci nastavte `CAMUNDA_USERNAME` a `CAMUNDA_PASSWORD`.
 
+Run `dotnet run` and choose **Main Camunda** for direct engine operations, or **Sandbox** for isolated editing and tests. Entering the sandbox automatically saves the latest version of every source process (separately per tenant). **Modely procesů → Uložené procesy Camundy** opens the local catalogue; each model offers the editor, a terminal test, and publication. `0` returns to the server chooser.
+
 V menu se vybírá číslem, `0` vrací zpět a `:back` ruší zadávání. Enter v přehledu instance obnoví stav. Podrobné postupy jsou v [HOW_TO_RUN.md](HOW_TO_RUN.md).
 
 ```bash
 dotnet run -- help     # seznam příkazů
 dotnet run -- watch    # průběžné sledování změn
 dotnet run -- demo     # automatické scénáře na připojené Camundě
+dotnet run -- visualize models/order-approval.bpmn  # локальный BPMN-редактор в браузере
 ```
 
 ## Možnosti
@@ -35,7 +38,20 @@ dotnet run -- demo     # automatické scénáře na připojené Camundě
 - Zamknutí a dokončení externích úloh, hlášení chyby a nastavení počtu pokusů.
 - Zprávy, signály, strom aktivit, jobs, incidenty a historie.
 
-Položka **5 — Přidat ukázkové modely** nasadí `console_registration` a `order_approval` ze složky `models/`. Registrace ukazuje formulář, rozhodnutí, externí úlohu a čekání na zprávu; objednávka obsahuje schválení a zamítnutí. Konzole také obsahuje vstupní nápovědy pro standardní Invoice a ReviewInvoice, pokud jsou nainstalované na serveru.
+Sandbox workflow:
+
+1. Enter Sandbox. The catalogue synchronizes all current processes from the main Camunda (`CAMUNDA_URL`, default port 8080), without deploying or starting anything.
+2. Complete deployment resources are downloaded with GET requests into `.sandbox-models/camunda/`. Existing edits are preserved. The catalogue shows one latest source version per process/tenant; older drafts remain on disk. If the main server is offline, saved copies remain usable. Refresh is available under **Sandbox koncepty → Obnovit katalog z hlavní Camundy**.
+3. Select a saved model: open it in the browser editor, or deploy and test it directly from the terminal. Save browser edits and return with Ctrl+C. Deployment, starts, tasks, variables and cancellation target only port 18080.
+4. **Publikovat sandbox model na hlavní Camundu** is a separate confirmed action, also available from the model card. It publishes the whole imported deployment, including accompanying models, DMN and forms, preserving resource names and tenant. With the same BPMN process ID this becomes the latest main version for new starts by key; existing main instances remain on their original versions.
+
+Build the editor with `cd BpmnEditor && npm ci && npm run build`. Start the isolated engine with `docker compose -f docker-compose.sandbox.yml up -d`. New containers start without the bundled example application. Existing deployments are not automatically deleted. The editor catalogue contains saved drafts; source files can be explicitly imported by path. Demo models in `models/` remain CLI/test fixtures and are no longer offered for installation in the menu.
+
+Sandbox authentication uses `CAMUNDA_SANDBOX_USERNAME` / `CAMUNDA_SANDBOX_PASSWORD`; main credentials are never automatically sent to the sandbox. The application rejects a main URL pointing to the local sandbox port. Configure genuinely separate engines; URL validation cannot detect arbitrary proxies pointing to the same database.
+
+Deployment resources do not include Java delegate binaries, running workers, external databases, or dependencies in other deployments. Install these separately in the sandbox and point services at test systems before execution. Referenced subprocesses can be imported separately; hard-coded version bindings may need adjusting for sandbox versions. Production instance state is not cloned. REST resource transfer follows the [Camunda 7 deployment API](https://docs.camunda.org/rest/camunda-bpm-platform/7.24/).
+
+The import/publication layer is implemented by `SandboxWorkspace` and separate source/target API clients. A forwarding HTTP proxy is not required. The browser editor in `BpmnEditor/` is the active visualizer. The unused standalone WPF visualizer has been archived outside the source tree. `models/` retains the two integration examples used by `ScenarioDemo`; these fixtures are not automatically deployed.
 
 ## Struktura
 

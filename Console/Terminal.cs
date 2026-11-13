@@ -12,6 +12,27 @@ internal sealed class Terminal(TextReader input, TextWriter output)
 {
     public void Line(string text = "") => output.WriteLine(text);
 
+    public void BeginScreen()
+    {
+        // Avoid alternate-screen mode in VS Code terminals. It clears the scrollback history,
+        // which makes previous terminal output disappear and prevents users from reviewing past steps.
+        ClearScreen();
+    }
+
+    public void ClearScreen()
+    {
+        if (!ReferenceEquals(output, Console.Out))
+            return;
+
+        output.Write("\u001b[2J\u001b[H");
+        output.Flush();
+    }
+
+    public void EndScreen()
+    {
+        // Keep the normal terminal buffer so the user can still scroll and inspect earlier output.
+    }
+
     public void Heading(string title)
     {
         Line();
@@ -88,9 +109,43 @@ internal sealed class Terminal(TextReader input, TextWriter output)
             return null;
         }
 
-        var index = await Menu(rows.Select(x => Clean(label(x))).ToArray(), ct);
+        const int pageSize = 20;
+        var offset = 0;
+        while (true)
+        {
+            var currentPage = rows.Skip(offset).Take(pageSize).ToArray();
+            var options = currentPage.Select(x => Clean(label(x))).ToArray();
+            int? prevIndex = null;
+            int? nextIndex = null;
+            if (offset > 0)
+            {
+                prevIndex = options.Length + 1;
+                options = [..options, "← Předchozí stránka"];
+            }
+            if (offset + pageSize < rows.Count)
+            {
+                nextIndex = options.Length + 1;
+                options = [..options, "Další stránka →"];
+            }
 
-        return index == 0 ? null : rows[index - 1];
+            var index = await Menu(options, ct);
+            if (index == 0)
+                return null;
+            if (index <= currentPage.Length)
+                return currentPage[index - 1];
+            if (prevIndex is not null && index == prevIndex)
+            {
+                offset = Math.Max(0, offset - pageSize);
+                continue;
+            }
+            if (nextIndex is not null && index == nextIndex)
+            {
+                offset += pageSize;
+                continue;
+            }
+
+            Line("  Zadejte číslo ze seznamu.");
+        }
     }
 
     public async Task Pause(CancellationToken ct) => await Ask("Enter — pokračovat", ct);

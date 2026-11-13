@@ -4,7 +4,7 @@ using Camunda.Api;
 namespace Bakalarka.ConsoleApp;
 
 /// <summary>Navigace a akce aplikace. Pristup k enginu probiha pres ICamundaClient.</summary>
-internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui)
+internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui, bool sandboxMode = false, ICamundaClient? sourceApi = null)
 {
     private CancellationToken shutdown;
 
@@ -16,28 +16,38 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
 
     private readonly Dictionary<string, string> models = new();
 
-    public async Task RunAsync(string address, CancellationToken ct)
+    public async Task RunAsync(string address, CancellationToken ct, bool returnToEnvironmentChooser = false)
     {
         shutdown = ct;
-        ui.Heading("CAMUNDA • Správa procesů");
+        ui.Heading(sandboxMode
+            ? "CAMUNDA SANDBOX • Správa procesů"
+            : "CAMUNDA • Správa procesů");
         ui.Field("Server", address);
         ui.Line("  Akce vybírejte číslem. 0 — zpět, :back — zrušit zadávání, Ctrl+C — ukončit.");
 
         try
         {
+            if (sandboxMode) await RefreshSandboxCatalogAsync(ct);
             while (true)
             {
                 ui.Heading("Hlavní nabídka");
-                var choice = await ui.Menu(
-                [
+                var choices = new List<string>
+                {
                     "Modely procesů — výběr a spuštění",
                     "Aktivní procesy — úlohy a ovládání",
                     "Historie procesů",
-                    "Nahrát BPMN ze souboru",
-                    "Přidat ukázkové modely",
-                    "Návod k použití",
-                    "Odstranit nasazení modelu"
-                ], ct, "Ukončit");
+                    "Nahrát BPMN ze souboru"
+                };
+                if (sandboxMode)
+                {
+                    choices.Add("Sandbox koncepty — editor / import souboru / obnovit z Camundy");
+                    choices.Add("Publikovat sandbox model na hlavní Camundu");
+                }
+                choices.Add("Návod k použití");
+                choices.Add("Odstranit nasazení modelu");
+
+                var choice = await ui.Menu(choices.ToArray(), ct,
+                    returnToEnvironmentChooser ? "Zpět k výběru Camundy" : "Ukončit");
 
                 if (choice == 0)
                     return;
@@ -61,26 +71,31 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
                             await DeployAsync(await ui.Ask("Cesta k souboru .bpmn", ct), ct);
                             break;
 
-                        case 5:
-
-                            foreach (var file in new[] { "registration-console.bpmn", "order-approval.bpmn" })
-                                await DeployAsync(Path.Combine(AppContext.BaseDirectory, "models", file), ct);
+                        case 5 when sandboxMode:
+                            await OpenAnyBpmnInEditorAsync(ct);
                             break;
 
-                        case 6:
+                        case 6 when sandboxMode:
+                            await PromoteSandboxModelAsync(ct);
+                            break;
+
+                        case 5:
+                        case 7 when sandboxMode:
                             ui.Line("  1. Otevřete modely: seznam se načítá z Camundy, včetně Invoice a ReviewInvoice.");
                             ui.Line("  2. Vyberte verzi, spusťte proces a vyplňte vstupní pole.");
                             ui.Line("  3. V přehledu procesu otevřete úlohu. Převezměte ji nebo dokončete s údaji.");
                             ui.Line("  4. Externí úloha se dokončuje ručně; zprávu odešlete v nabídce událostí.");
                             ui.Line("  5. Pokud proces čeká na podproces, otevřete jej z přehledu nadřazeného procesu.");
+                            ui.Line("  6. V sandboxu otevřete BPMN ve vizualizátoru; uloženou verzi lze otestovat a pak poslat na hlavní Camundu.");
                             ui.Line("  Po provedení akce se stav znovu načte. Enter v přehledu — obnovit.");
                             ui.Line("  Průběžné sledování v jiném terminálu: dotnet run -- watch");
-                            ui.Line("  Pro registraci přidejte ukázkové modely a vyberte console_registration.");
+                            ui.Line("  V sandbox editoru vyberte proces hlavní Camundy, například prace_1.");
                             ui.Line("  Externí úloha: předáváte výsledek práce, konzole neprovádí její obchodní logiku.");
                             await ui.Pause(ct);
                             break;
 
-                        case 7:
+                        case 6:
+                        case 8 when sandboxMode:
                             await DeleteDeploymentAsync(ct);
                             break;
                     }
@@ -140,10 +155,19 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
 
     private async Task DefinitionsAsync(CancellationToken ct)
     {
+        if (sandboxMode)
+        {
+            var choice = await ui.Menu(["Uložené procesy Camundy — editace / test / publikace", "Verze již nasazené v sandboxu"], ct);
+            if (choice == 0) return;
+            if (choice == 1) { await SandboxModelsAsync(ct); return; }
+        }
         await LoadDefinitionsAsync(ct);
         ui.Heading("Modely • všechny verze dostupné přes toto připojení");
+        var latestVersions = definitions.Values
+            .GroupBy(definition => (definition.Key, definition.TenantId))
+            .ToDictionary(group => group.Key, group => group.Max(definition => definition.Version));
         var model = await ui.Select(definitions.Values.OrderBy(d => d.Key).ThenByDescending(d => d.Version).ToArray(),
-            d => $"{d.Name ?? d.Key} | {d.Key} | v{d.Version}{(d.TenantId is null ? "" : " | tenant=" + d.TenantId)}{(d.Suspended ? " | POZASTAVENO" : "")}", ct);
+            d => $"{d.Name ?? d.Key} | {d.Key} | v{d.Version}{(latestVersions[(d.Key, d.TenantId)] == d.Version ? " | LATEST" : "")}{(d.TenantId is null ? "" : " | tenant=" + d.TenantId)}{(d.Suspended ? " | POZASTAVENO" : "")}", ct);
 
         if (model is null)
             return;
@@ -153,18 +177,7 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         switch (await ui.Menu(["Spustit tuto verzi", "Otevřít aktivní instance tohoto procesu", "Uložit BPMN XML do souboru"], ct))
         {
             case 1:
-
-                if (model.Suspended)
-                {
-                    ui.Line("  Definice je v enginu pozastavena.");
-                    return;
-                }
-
-                var businessKey = await ui.Ask("Označení instance / Enter — bez označení", ct);
-                var variables = await editor.EditAsync(await FieldsAsync(model.Id, null, ct), null, ct);
-                var instance = await api.StartByDefinitionAsync(model.Id, variables, businessKey.Length == 0 ? null : businessKey, ct);
-                ui.Success("Proces spuštěn: " + instance.Id);
-                await InstanceAsync(instance.Id, ct);
+                await StartDefinitionAsync(model, ct);
                 break;
 
             case 2:
@@ -181,6 +194,22 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         }
     }
 
+    private async Task StartDefinitionAsync(ProcessDefinition model, CancellationToken ct)
+    {
+        if (model.Suspended)
+        {
+            ui.Line("  Definice je v enginu pozastavena.");
+            return;
+        }
+
+        var businessKey = await ui.Ask("Označení instance / Enter — bez označení", ct);
+        var variables = await editor.EditAsync(await FieldsAsync(model.Id, null, ct), null, ct);
+        var instance = await api.StartByDefinitionAsync(model.Id, variables,
+            businessKey.Length == 0 ? null : businessKey, ct);
+        ui.Success($"{(sandboxMode ? "Sandbox" : "Proces")} v{model.Version} spuštěn: {instance.Id}");
+        await InstanceAsync(instance.Id, ct);
+    }
+
     private async Task InstancesAsync(string? key, CancellationToken ct)
     {
         await LoadDefinitionsAsync(ct);
@@ -192,11 +221,11 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
             await InstanceAsync(instance.Id, ct);
     }
 
-    private async Task DeployAsync(string path, CancellationToken ct)
+    private async Task<Deployment> DeployAsync(string path, CancellationToken ct, ICamundaClient? targetApi = null)
     {
-        await using var file = File.OpenRead(path);
-        var deployed = await api.DeployAsync(Path.GetFileNameWithoutExtension(path), file, Path.GetFileName(path), ct);
+        var deployed = await SandboxWorkspace.DeployAsync(targetApi ?? api, path, ct);
         ui.Success("Nahráno: " + Path.GetFileName(path) + " | " + deployed.Id);
+        return deployed;
     }
 
     private async Task DeleteDeploymentAsync(CancellationToken ct)

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3f5f2" />
+    <title>BPMN Studio</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="BPMN Studio">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>BPMN <strong>Studio</strong></span>
+        </a>
+        <div class="document-name">
+          <span class="document-dot" aria-hidden="true"></span>
+          <label class="model-picker-wrap" for="model-picker">
+            <span class="sr-only">Select model</span>
+            <select id="model-picker" aria-label="Select BPMN model"></select>
+          </label>
+          <span id="file-name">Loading model</span>
+        </div>
+        <div class="toolbar">
+          <span class="save-state" id="save-state" role="status">Loading...</span>
+          <button class="tool-button" id="zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+          <button class="tool-button" id="zoom-fit" type="button" title="Fit diagram" aria-label="Fit diagram">Fit</button>
+          <button class="tool-button" id="zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button class="save-button" id="save" type="button" disabled>Save</button>
+        </div>
+      </header>
+      <section class="workspace" aria-label="BPMN editor">
+        <div id="canvas" class="diagram-canvas"></div>
+        <div id="error-panel" class="error-panel" hidden></div>
+      </section>
+      <footer class="statusbar">
+        <span>Sandbox copy</span>
+        <span id="selection-state">Select an element to edit the diagram</span>
+        <span class="local-badge"><span aria-hidden="true"></span> CAMUNDA DISCONNECTED</span>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

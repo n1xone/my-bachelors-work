@@ -2,7 +2,12 @@ bin/
 obj/
 Data/
 .venv/
+BpmnEditor/node_modules/
+BpmnEditor/dist/
+.sandbox-models/
 __pycache__/
 *.py[cod]
 .env
 *.user
+
+.camunda-backup/

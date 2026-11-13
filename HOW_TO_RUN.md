@@ -2,13 +2,13 @@
 
 ## Spuštění
 
-Spusťte Camundu, počkejte na její načtení a v kořenové složce projektu spusťte:
+Start the application from the project root:
 
 ```bash
 dotnet run
 ```
 
-Otevře se české konzolové menu. Sledovač lze spustit samostatně příkazem `dotnet run -- watch` a ukončit pomocí Ctrl+C.
+Choose **Sandbox Camunda** or **Main Camunda**. In the main menu, `0` returns to the server chooser; `0` in the chooser exits. The sandbox is option 1 and the main server is option 2. The watcher can still be started directly with `dotnet run -- watch` and stopped with Ctrl+C.
 
 Výchozí adresa je `http://localhost:8080/engine-rest/`. Jinou adresu lze nastavit takto:
 
@@ -18,10 +18,61 @@ CAMUNDA_URL=http://localhost:18080/engine-rest/ dotnet run
 
 Camundu spusťte samostatně, například ve svém Docker kontejneru. Pokud již běží, použijte stávající server. Připravenost ověříte příkazem `curl --fail http://localhost:8080/engine-rest/version`.
 
+## Isolated Camunda Sandbox
+
+Start the separate test engine:
+
+```bash
+docker compose -f docker-compose.sandbox.yml up -d
+dotnet run -- sandbox definitions
+dotnet run -- sandbox menu
+```
+
+The `sandbox` prefix forces the CLI to use `http://127.0.0.1:18080/engine-rest/` and ignores `CAMUNDA_URL`. All commands, including deployment, process start, tasks, variables, and cancellation, are then scoped to the isolated container instead of the regular engine on port 8080. Remove the sandbox and its database with `docker compose -f docker-compose.sandbox.yml down -v`. This is a separate Camunda engine, not a reverse proxy to production.
+
+## BPMN Editor
+
+Při prvním použití nainstalujte a sestavte browserový editor (vyžaduje Node.js/npm):
+
+```bash
+cd BpmnEditor
+npm ci
+npm run build
+cd ..
+```
+
+Potom spusťte z kořene projektu:
+
+```bash
+dotnet run -- visualize models/order-approval.bpmn
+```
+
+Entering Sandbox automatically downloads the latest version of every main process into local storage. Choose **Modely procesů → Uložené procesy Camundy**, then `BAKALARKA | prace_1` (or another process). Its card offers **Otevřít ve vizualizátoru**, **Nasadit uloženou kopii do sandboxu a spustit test**, and **Publikovat tuto kopii na hlavní Camundu**. The terminal test works without opening a browser. When the main server is unavailable you can use the saved catalogue. To refresh it, choose **Sandbox koncepty → Obnovit katalog z hlavní Camundy**. Existing edits are preserved and older source versions stay on disk. The working catalogue shows one latest draft per process/tenant; fixtures are excluded.
+
+Save in the browser, then press Ctrl+C in the terminal. The selected draft and its original deployment resources are deployed only to the sandbox; unchanged deployments use duplicate filtering. You can start the offered sandbox version and inspect tasks, variables and incidents. Main process instances are never cloned or modified by this workflow.
+
+After testing, choose **Publikovat sandbox model na hlavní Camundu**, review the selected draft and target, then confirm publication. This publishes the whole imported package, preserving resource names and tenant. It does not migrate existing instances. Java delegates, external workers and services must be configured separately for sandbox execution; dependencies from other deployments must be imported separately. See README for isolation limits and authentication.
+
+The standalone command `dotnet run -- visualize models/registration-console.bpmn` opens the same local editor, but the interactive sandbox menu provides the deploy-and-test flow.
+
+For an optional command-line example, explicitly deploy `models/order-approval.bpmn` to the sandbox. Complete its approval task with `samples/order-approved.json` or `samples/order-rejected.json`:
+
+```bash
+dotnet run -- sandbox deploy models/order-approval.bpmn
+dotnet run -- sandbox start order_approval
+dotnet run -- sandbox tasks <instance-id>
+dotnet run -- sandbox complete <approval-task-id> samples/order-approved.json
+dotnet run -- sandbox fetch prepare_order cli-worker <instance-id>
+dotnet run -- sandbox external-complete <external-task-id> cli-worker
+dotnet run -- sandbox message <instance-id> order_delivered
+```
+
+Approval continues through preparation and delivery; rejection ends the process. These commands execute only in the sandbox engine.
+
 ## Registrace
 
-1. V hlavním menu zvolte **5 — Přidat ukázkové modely**. Nahraje se registrace a objednávka. Opakované nahrání stejné verze omezuje filtrování duplicit.
-2. Zvolte **1 — Modely procesů** → **Registrace — konzolová ukázka**, klíč `console_registration` → **Spustit tuto verzi**.
+1. Volitelnou testovací ukázku nahrajte explicitně: `dotnet run -- sandbox deploy models/registration-console.bpmn`. Nejde o skutečnou registraci `prace_1`; ta se importuje z hlavní Camundy.
+2. Zvolte **1 — Modely procesů** → **Verze již nasazené v sandboxu** → **Registrace — konzolová ukázka**, klíč `console_registration` → **Spustit tuto verzi**.
 3. Zadejte označení instance nebo ponechte prázdné. Na výzvu k další proměnné stiskněte Enter.
 4. V kartě instance zvolte **1 — Úlohy** → **Vyplnit registraci** → **Vyplnit údaje a dokončit**.
 5. Zadejte jméno, oddělení a `ano` pro schválení. Enter u dalších proměnných ukončí zadávání. Při volbě `ne` proces skončí větví zamítnutí.

@@ -9,6 +9,10 @@ public interface ICamundaClient
         string fileName,
         CancellationToken ct = default);
 
+    Task<IReadOnlyList<DeploymentResource>> GetDeploymentResourcesAsync(string deploymentId, CancellationToken ct = default);
+    Task<byte[]> GetDeploymentResourceAsync(string deploymentId, string resourceId, CancellationToken ct = default);
+    Task<Deployment> DeployResourcesAsync(string name, IReadOnlyDictionary<string, byte[]> resources, string? tenantId = null, CancellationToken ct = default);
+
     Task DeleteDeploymentAsync(string deploymentId, CancellationToken ct = default);
 
     Task<IReadOnlyList<ProcessDefinition>> GetDefinitionsAsync(

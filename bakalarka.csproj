@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="BpmnEditorHost.cs" />
     <Content Include="samples/*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="models/*.bpmn" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="Console/*.cs" />

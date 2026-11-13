@@ -89,14 +89,34 @@ public sealed partial class CamundaClient : ICamundaClient
         // Bufferovani zachova stream volajiciho i po uvolneni multipart obsahu.
         using var buffer = new MemoryStream();
         await bpmn.CopyToAsync(buffer, ct).ConfigureAwait(false);
+        return await DeployResourcesAsync(name, new Dictionary<string, byte[]> { [Path.GetFileName(fileName)] = buffer.ToArray() }, ct: ct);
+    }
+
+    public async Task<IReadOnlyList<DeploymentResource>> GetDeploymentResourcesAsync(string deploymentId, CancellationToken ct = default) =>
+        await SendAsync<DeploymentResource[]>(HttpMethod.Get, $"deployment/{E(deploymentId)}/resources", null, ct);
+
+    public async Task<byte[]> GetDeploymentResourceAsync(string deploymentId, string resourceId, CancellationToken ct = default)
+    {
+        using var response = await http.GetAsync($"deployment/{E(deploymentId)}/resources/{E(resourceId)}/data", ct);
+        await CheckAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    public async Task<Deployment> DeployResourcesAsync(string name, IReadOnlyDictionary<string, byte[]> resources,
+        string? tenantId = null, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (resources.Count == 0) throw new ArgumentException("Deployment requires resources.");
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(name), "deployment-name");
         content.Add(new StringContent("true"), "enable-duplicate-filtering");
-        content.Add(new ByteArrayContent(buffer.ToArray()), "data", Path.GetFileName(fileName));
-        using var response = await http.PostAsync("deployment/create", content, ct).ConfigureAwait(false);
-        await CheckAsync(response, ct).ConfigureAwait(false);
-
-        return await response.Content.ReadFromJsonAsync<Deployment>(Json, ct).ConfigureAwait(false)
+        if (tenantId is not null) content.Add(new StringContent(tenantId), "tenant-id");
+        var index = 0;
+        foreach (var (resourceName, bytes) in resources)
+            content.Add(new ByteArrayContent(bytes), "resource" + index++, resourceName);
+        using var response = await http.PostAsync("deployment/create", content, ct);
+        await CheckAsync(response, ct);
+        return await response.Content.ReadFromJsonAsync<Deployment>(Json, ct)
             ?? throw new JsonException("Camunda returned a null deployment.");
     }
 

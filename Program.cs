@@ -1,12 +1,18 @@
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using Camunda.Api;
 using Bakalarka.ConsoleApp;
 
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-if (args.Length == 0) args = ["menu"];
+var chooseEnvironment = args.Length == 0;
+if (chooseEnvironment) args = ["menu"];
+
+var sandboxMode = args[0] == "sandbox";
+if (sandboxMode)
+{
+    args = args.Skip(1).ToArray();
+    if (args.Length == 0) args = ["menu"];
+}
 
 if (args[0] is "help" or "--help" or "-h")
 {
@@ -40,6 +46,9 @@ if (args[0] is "help" or "--help" or "-h")
     history <instanceId>
     activity-history <instanceId> [offset] [limit]
     demo [cesta-ke-kořeni-projektu]
+    visualize <model.bpmn>              (local browser-based BPMN editor)
+    sandbox import <definitionId>       (copy source deployment and deploy only to sandbox)
+    sandbox <command> [arguments]        (force Camunda requests to localhost:18080)
 
     Výchozí CAMUNDA_URL=http://localhost:8080/engine-rest/
     Volitelné: CAMUNDA_USERNAME, CAMUNDA_PASSWORD (HTTP Basic).
@@ -52,18 +61,42 @@ if (args[0] is "help" or "--help" or "-h")
 }
 
 using var cancellation = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    if (!BpmnEditorHost.TryHandleEditorCtrlC())
+        cancellation.Cancel();
+};
 var ct = cancellation.Token;
+var httpClients = new List<HttpClient>();
+var terminal = new Terminal(Console.In, Console.Out);
 
 try
 {
-    var url = Environment.GetEnvironmentVariable("CAMUNDA_URL") ?? "http://localhost:8080/engine-rest/";
-    using var http = new HttpClient { BaseAddress = new Uri(url.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(30) };
-    var username = Environment.GetEnvironmentVariable("CAMUNDA_USERNAME");
+    if (chooseEnvironment)
+    {
+        var selection = await terminal.Menu(
+        [
+            "Sandbox Camunda — isolated tests (127.0.0.1:18080)",
+            "Main Camunda — primary server (localhost:8080)"
+        ], ct, "Exit");
 
-    if (!string.IsNullOrEmpty(username))
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
-            Convert.ToBase64String(Encoding.UTF8.GetBytes(username + ":" + Environment.GetEnvironmentVariable("CAMUNDA_PASSWORD"))));
+        if (selection == 0)
+            return 0;
+        sandboxMode = selection == 1;
+    }
+
+    var url = sandboxMode ? CamundaConnections.SandboxAddress : CamundaConnections.MainAddress;
+    HttpClient CreateHttpClient(string address)
+    {
+        var client = CamundaConnections.Create(address);
+        httpClients.Add(client);
+        return client;
+    }
+    var sourceApi = new CamundaClient(CreateHttpClient(CamundaConnections.MainAddress));
+    if (sandboxMode) CamundaConnections.EnsureSeparate(CamundaConnections.MainAddress);
+
+    var http = CreateHttpClient(url);
     ICamundaClient api = new CamundaClient(http);
     string Arg(int index) => index < args.Length ? args[index] : throw new ArgumentException($"Chybí argument {index}; viz help.");
     int Number(int index, int fallback) => index < args.Length ? int.Parse(args[index]) : fallback;
@@ -87,7 +120,38 @@ try
     switch (args[0])
     {
         case "menu":
-            await new InteractiveConsole(api, new Terminal(Console.In, Console.Out)).RunAsync(http.BaseAddress!.ToString(), ct);
+            while (true)
+            {
+                await new InteractiveConsole(api, terminal, sandboxMode, sourceApi)
+                    .RunAsync(http.BaseAddress!.ToString(), ct, chooseEnvironment);
+
+                if (!chooseEnvironment)
+                    break;
+
+                var selection = await terminal.Menu(
+                [
+                    "Sandbox Camunda — isolated tests (127.0.0.1:18080)",
+                    "Main Camunda — primary server (localhost:8080)"
+                ], ct, "Exit");
+
+                if (selection == 0)
+                    break;
+
+                sandboxMode = selection == 1;
+                if (sandboxMode) CamundaConnections.EnsureSeparate(CamundaConnections.MainAddress);
+                var nextUrl = sandboxMode ? CamundaConnections.SandboxAddress : CamundaConnections.MainAddress;
+                http = CreateHttpClient(nextUrl);
+                api = new CamundaClient(http);
+            }
+            break;
+
+        case "import" when sandboxMode:
+            var sourceDefinitions = await Pagination.ReadAllAsync((offset, limit) => sourceApi.GetDefinitionsAsync(offset, limit, ct));
+            var sourceDefinition = sourceDefinitions.SingleOrDefault(d => d.Id == Arg(1))
+                ?? throw new ArgumentException("Source definition ID was not found.");
+            var importedPath = await SandboxWorkspace.ImportAsync(sourceApi, sourceDefinition, Directory.GetCurrentDirectory(), ct);
+            var importedDeployment = await SandboxWorkspace.DeployAsync(api, importedPath, ct);
+            Print(new { path = importedPath, deployment = importedDeployment });
             break;
 
         case "watch":
@@ -223,6 +287,14 @@ try
             await ScenarioDemo.RunAsync(api, args.Length > 1 ? args[1] : Directory.GetCurrentDirectory(), ct);
             break;
 
+        case "visualize":
+            var modelPath = Path.GetFullPath(Arg(1));
+            if (!File.Exists(modelPath))
+                throw new FileNotFoundException("BPMN model file was not found.", modelPath);
+            var editorDirectory = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "BpmnEditor", "dist"));
+            await BpmnEditorHost.RunAsync(modelPath, editorDirectory, ct);
+            break;
+
         default:
             throw new ArgumentException($"Neznámý příkaz '{args[0]}'; viz help.");
     }
@@ -231,7 +303,7 @@ try
 }
 catch (OperationCanceledException) when (ct.IsCancellationRequested) { Console.Error.WriteLine("Zrušeno uživatelem."); return 130; }
 catch (OperationCanceledException) { Console.Error.WriteLine("Camunda neodpověděla včas. U zápisu ověřte stav před opakováním."); return 1; }
-catch (Exception ex) when (ex is HttpRequestException or IOException or ArgumentException or JsonException or FormatException or OverflowException or InvalidOperationException)
+catch (Exception ex) when (ex is HttpRequestException or IOException or ArgumentException or JsonException or FormatException or OverflowException or InvalidOperationException or PlatformNotSupportedException)
 {
     Console.Error.WriteLine(ex.Message);
 
@@ -239,4 +311,10 @@ catch (Exception ex) when (ex is HttpRequestException or IOException or Argument
         Console.Error.WriteLine(ex.GetBaseException().Message);
 
     return 1;
+}
+finally
+{
+    terminal.EndScreen();
+    foreach (var client in httpClients)
+        client.Dispose();
 }
