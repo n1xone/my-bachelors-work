@@ -107,7 +107,7 @@ Volající vlastní `HttpClient` a nastavuje autentizaci i timeout. Seznamy podp
 
 ## Omezení
 
-Knihovna podporuje Camundu 7 a uvedené operace, nikoli celý REST API. Neobsahuje formální verifikátor, správu uživatelů ani migrace procesů. Absence incidentu sama o sobě nedokazuje absenci deadlocku.
+Knihovna podporuje Camundu 7 a uvedené operace, nikoli celý REST API. Neobsahuje formální verifikátor, správu uživatelů ani obecné automatické převody libovolných BPMN změn. Absence incidentu sama o sobě nedokazuje absenci deadlocku.
 
 Jednotlivé dotazy netvoří atomický snímek. `watch` může minout změny mezi dvěma dotazy. Výsledek ukončené instance se čte z historie; její dostupnost závisí na nastavení serveru.
 
@@ -137,3 +137,17 @@ Test vytváří vlastní instance a uklízí své nedokončené běhy. Příkaz 
 
 - [Camunda 7 REST API](https://docs.camunda.org/manual/7.24/reference/rest/)
 - [Typované proměnné](https://docs.camunda.org/manual/7.24/reference/rest/overview/variables/)
+
+## Live updates of running instances
+
+In **Main Camunda → Modely procesů → select a version → Upravit živý proces ve vizualizátoru**, Save deploys the draft to the selected engine and migrates running instances of the same process/tenant. The editor displays the target server. Sandbox saves update only the sandbox; they do not update main instances. `visualize` uses the engine selected by the CLI prefix.
+
+The instance ID, completed history and compatible current tasks are preserved. Future flow uses the new definition. Changed fields on already visited forms are collected in the terminal; fields belonging only to future forms are left for their normal execution. Removed form variables are deleted from runtime scope (history is retained). Schema-only migration does not suspend execution. Data updates briefly suspend an active instance, then automatically resume it. Existing suspension is preserved. A rejected migration resumes the original version; a partial data failure after migration leaves the instance suspended. A recovery journal (variable names only, no values) lets the next Save finish deletion and restore its original running state, including after a console restart.
+
+The engine validates activity mappings. Deleted current activities require an explicit compatible replacement; arbitrary structural changes cannot always be migrated. Existing external jobs, external services and already performed business actions are not automatically recreated or undone. Changes to fields must be represented in `camunda:formData`; HTML forms and external schemas are not inferred.
+
+Cockpit pages showing a specific old definition remain historical views. Refresh/open the same instance to see its new definition after successful save. Full save errors are shown in the browser and engine errors in the terminal.
+
+Live integration test (creates and cleans up its own test process): `dotnet run --project tests/LiveMigration`. It exercises the actual save callback against `CAMUNDA_URL` and checks instance identity, current task, input collection, deletion and the new future route.
+
+Migration regression coverage is described in [tests/LiveMigration/README.md](tests/LiveMigration/README.md).

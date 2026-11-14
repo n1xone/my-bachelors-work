@@ -50,7 +50,7 @@ internal sealed partial class InteractiveConsole
             ui.Line();
             ui.Line("  1 Úlohy    2 Externí úlohy    3 Zprávy / signály    4 Proměnné");
             ui.Line("  5 Pozastavit / obnovit    6 Historie    7 Podprocesy    8 Joby / chyby");
-            ui.Line("  9 Aktivity / přijímací úloha    10 Zrušit proces    0 Zpět    Enter Obnovit");
+            ui.Line("  9 Aktivity / přijímací úloha    10 Zrušit proces    11 Aktualizovat verzi    0 Zpět    Enter Obnovit");
             var command = await ui.Ask("Akce", ct);
 
             if (command == "0")
@@ -106,6 +106,10 @@ internal sealed partial class InteractiveConsole
 
                     case "9":
                         await ActivitiesAsync(id, ct);
+                        break;
+
+                    case "11":
+                        await UpdateVersionAsync(process, ct);
                         break;
 
                     case "10":

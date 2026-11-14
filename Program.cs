@@ -292,7 +292,8 @@ try
             if (!File.Exists(modelPath))
                 throw new FileNotFoundException("BPMN model file was not found.", modelPath);
             var editorDirectory = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "BpmnEditor", "dist"));
-            await BpmnEditorHost.RunAsync(modelPath, editorDirectory, ct);
+            var liveEditor = new InteractiveConsole(api, terminal, sandboxMode);
+            await BpmnEditorHost.RunAsync(modelPath, editorDirectory, ct, liveEditor.ApplySavedModelAsync, url);
             break;
 
         default:

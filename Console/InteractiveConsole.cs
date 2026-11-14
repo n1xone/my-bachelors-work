@@ -174,7 +174,7 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
         ui.Heading(model.Name ?? model.Key);
         ui.Field("ID definice", model.Id);
 
-        switch (await ui.Menu(["Spustit tuto verzi", "Otevřít aktivní instance tohoto procesu", "Uložit BPMN XML do souboru"], ct))
+        switch (await ui.Menu(["Spustit tuto verzi", "Otevřít aktivní instance tohoto procesu", "Uložit BPMN XML do souboru", "Upravit živý proces ve vizualizátoru"], ct))
         {
             case 1:
                 await StartDefinitionAsync(model, ct);
@@ -182,6 +182,11 @@ internal sealed partial class InteractiveConsole(ICamundaClient api, Terminal ui
 
             case 2:
                 await InstancesAsync(model.Key, ct);
+                break;
+
+            case 4:
+                var imported = await SandboxWorkspace.ImportAsync(api, model, Directory.GetCurrentDirectory(), ct);
+                await EditSandboxModelAsync(imported, ct);
                 break;
 
             case 3:

@@ -106,7 +106,7 @@ internal static class BpmnEditorHost
         return fullPath;
     }
 
-    public static async Task<string?> RunAsync(string modelPath, string webRoot, CancellationToken ct)
+    public static async Task<string?> RunAsync(string modelPath, string webRoot, CancellationToken ct, Func<string, CancellationToken, Task>? onSaved = null, string? engineAddress = null)
     {
         if (!File.Exists(Path.Combine(webRoot, "index.html")))
             throw new DirectoryNotFoundException("The BPMN editor is not built. Run: cd BpmnEditor && npm ci && npm run build");
@@ -138,7 +138,7 @@ internal static class BpmnEditorHost
         Console.WriteLine($"BPMN editor URL (open this in a browser): {address}");
         Console.WriteLine($"Sandbox copy: {sandboxPath}");
         Console.WriteLine("Edits are saved to the sandbox copy only. The source BPMN file is unchanged.");
-        Console.WriteLine("Save your edits, then press Ctrl+C in this terminal to deploy and return to the menu.");
+        Console.WriteLine(onSaved is null ? "Save your edits, then press Ctrl+C to return." : "Save deploys and updates active instances on the selected engine. Complete requested values in this terminal; Ctrl+C returns to the menu.");
 
         try
         {
@@ -173,7 +173,7 @@ internal static class BpmnEditorHost
 
                 var context = await contextTask.WaitAsync(ct);
                 await HandleRequestAsync(context, sandboxPath, initialModelPath, webRoot,
-                    selectedPath => activeModelPath = selectedPath, ct);
+                    selectedPath => activeModelPath = selectedPath, ct, onSaved, engineAddress);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -190,7 +190,7 @@ internal static class BpmnEditorHost
         string displayFileName,
         string webRoot,
         Action<string> modelSelected,
-        CancellationToken ct)
+        CancellationToken ct, Func<string, CancellationToken, Task>? onSaved, string? engineAddress)
     {
         try
         {
@@ -224,6 +224,7 @@ internal static class BpmnEditorHost
                     await WriteAsync(context.Response, 200, "application/json; charset=utf-8",
                         JsonSerializer.SerializeToUtf8Bytes(new
                         {
+                            engineAddress,
                             fileName = Path.GetFileName(targetPath),
                             relativePath = string.IsNullOrWhiteSpace(requestedPath) ? displayFileName : requestedPath,
                             xml
@@ -253,7 +254,8 @@ internal static class BpmnEditorHost
                         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
                     }
 
-                    await WriteTextAsync(context.Response, 200, "Saved", ct);
+                    if (onSaved is not null) await onSaved(targetPath, ct);
+                    await WriteTextAsync(context.Response, 200, onSaved is null ? "Draft saved" : "Saved; active instances updated on " + engineAddress, ct);
                     return;
                 }
 
@@ -279,6 +281,15 @@ internal static class BpmnEditorHost
             }
 
             await WriteAsync(context.Response, 200, ContentType(fullPath), await File.ReadAllBytesAsync(fullPath, ct), ct);
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine("Engine update failed: " + ex.Message);
+            await WriteTextAsync(context.Response, 409, "Draft saved; engine update failed: " + ex.Message, ct);
+        }
+        catch (Bakalarka.ConsoleApp.BackException)
+        {
+            await WriteTextAsync(context.Response, 409, "Draft saved; update canceled. Prepared instance remains suspended.", ct);
         }
         catch (InvalidDataException ex)
         {

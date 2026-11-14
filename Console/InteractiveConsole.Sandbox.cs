@@ -52,13 +52,12 @@ internal sealed partial class InteractiveConsole
         var editorRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "BpmnEditor", "dist"));
         ui.Heading("Editor BPMN");
         ui.Line($"  Otevírám: {BpmnEditorHost.RelativePathForDisplay(sourcePath, Directory.GetCurrentDirectory())}");
-        ui.Line("  Uložit lze pouze do místní kopie v .sandbox-models/. Zdrojový soubor se nemění.");
-        var selectedModelPath = await BpmnEditorHost.RunAsync(sourcePath, editorRoot, ct);
+        ui.Line("  Uložení nasadí novou verzi do připojené Camundy a aktualizuje její aktivní instance. Data doplňte v terminálu.");
+        var selectedModelPath = await BpmnEditorHost.RunAsync(sourcePath, editorRoot, ct, ApplySavedModelAsync, sandboxMode ? CamundaConnections.SandboxAddress : CamundaConnections.MainAddress);
         if (selectedModelPath is null)
             return;
 
-        var savedPath = BpmnEditorHost.ResolveProjectPath(selectedModelPath, Directory.GetCurrentDirectory());
-        await TestSandboxModelAsync(BpmnEditorHost.GetSandboxCopyPath(savedPath), ct);
+
     }
 
     private async Task TestSandboxModelAsync(string sandboxPath, CancellationToken ct)

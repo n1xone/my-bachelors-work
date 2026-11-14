@@ -3,6 +3,10 @@ namespace Camunda.Api;
 /// <summary>Obecny pristup ke Camunda 7. ID, klice, promenne a temata urcuje volajici.</summary>
 public interface ICamundaClient
 {
+    Task<System.Text.Json.JsonElement> ValidateMigrationAsync(System.Text.Json.JsonElement plan, CancellationToken ct = default);
+    Task DeleteVariablesAsync(string instanceId, string[] names, CancellationToken ct = default);
+    Task<System.Text.Json.JsonElement> GenerateMigrationAsync(string source, string target, CancellationToken ct = default);
+    Task MigrateAsync(System.Text.Json.JsonElement plan, string instanceId, IReadOnlyDictionary<string, Variable> variables, CancellationToken ct = default);
     Task<Deployment> DeployAsync(
         string name,
         Stream bpmn,

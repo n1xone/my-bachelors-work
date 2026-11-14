@@ -37,7 +37,7 @@ async function loadModel(relativePath = currentModelPath) {
   if (!response.ok) throw new Error(await response.text());
   const model = await response.json();
   currentModelPath = model.relativePath;
-  fileName.textContent = model.fileName;
+  fileName.textContent = model.engineAddress ? `${model.fileName} → ${model.engineAddress}` : model.fileName;
   document.title = `${model.fileName} | BPMN Studio`;
   modelPicker.value = model.relativePath;
   await modeler.importXML(model.xml);
@@ -88,7 +88,8 @@ modeler.on('selection.changed', ({ newSelection }) => {
 
 saveButton.addEventListener('click', async () => {
   saveButton.disabled = true;
-  saveState.textContent = 'Saving...';
+  saveState.textContent = 'Updating Camunda… check terminal for input';
+  saveState.title = 'При запросе данных заполните их в терминале. Экземпляр продолжит работу с тем же ID.';
   try {
     const { xml } = await modeler.saveXML({ format: true });
     const url = currentModelPath ? `/api/model?path=${encodeURIComponent(currentModelPath)}` : '/api/model';
@@ -98,9 +99,14 @@ saveButton.addEventListener('click', async () => {
       body: xml
     });
     if (!response.ok) throw new Error(await response.text());
+    const result = await response.text();
     setDirty(false);
+    saveState.textContent = result;
+    saveState.title = result;
   } catch (error) {
     saveState.textContent = `Save failed: ${error.message}`;
+    saveState.title = error.message;
+    window.alert(`Не удалось обновить Camunda.\n${error.message}`);
     saveButton.disabled = false;
   }
 });
